@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('问题通报管理')" />
+</head>
+<body class="gray-bg">
+<div class="wrapper wrapper-content animated fadeInRight">
+    <div class="row">
+        <div class="col-sm-12">
+            <div class="ibox float-e-margins">
+                <div class="ibox-title"><h5>问题通报管理</h5></div>
+                <div class="ibox-content">
+                    <!-- 月份筛选 + 工具栏 -->
+                    <div class="row">
+                        <div class="col-sm-12" style="margin-bottom: 10px;">
+                            <label>月份：</label>
+                            <input type="month" id="batchNo" style="width: 150px; display: inline-block; height: 30px;" />
+                            <button type="button" class="btn btn-primary" onclick="searchData()">
+                                <i class="fa fa-search"></i> 查询
+                            </button>
+                            <div class="pull-right">
+                                <button type="button" class="btn btn-success" onclick="$.operate.add()" th:if="${canAdd}">
+                                    <i class="fa fa-plus"></i> 新增
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="$.operate.removeAll()" th:if="${canRemove}">
+                                    <i class="fa fa-trash"></i> 批量删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 表格 -->
+                    <div class="table-responsive">
+                        <table id="bootstrap-table" class="table table-bordered table-hover"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div th:include="include :: footer" />
+<script th:inline="javascript">
+    var prefix = "/issue/list";
+    var canAdd = [[${canAdd}]];
+    var canEdit = [[${canEdit}]];
+    var canRemove = [[${canRemove}]];
+
+    $(function() {
+        var now = new Date();
+        var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+        $("#batchNo").val(month);
+
+        $.table.init({
+            url: prefix + "/list",
+            createUrl: prefix + "/add",
+            updateUrl: prefix + "/edit/{id}",
+            removeUrl: prefix + "/remove",
+            modalName: "问题通报",
+            uniqueId: "id",
+            queryParams: function(params) {
+                params.batchNo = $("#batchNo").val();
+                return params;
+            },
+            columns: [
+                { checkbox: true },
+                { field: 'businessLine', title: '业务线条' },
+                { field: 'issueDate', title: '时间' },
+                { field: 'problem', title: '问题' },
+                { field: 'solution', title: '对策' },
+                { field: 'source', title: '来源' },
+                { field: 'remark', title: '备注' },
+                {
+                    title: '操作',
+                    align: 'center',
+                    formatter: function(value, row, index) {
+                        var actions = [];
+                        if (canEdit) {
+                            actions.push('<a class="btn btn-success btn-xs" onclick="$.operate.edit(\'' + row.id + '\')"><i class="fa fa-edit"></i>编辑</a> ');
+                        }
+                        if (canRemove) {
+                            actions.push('<a class="btn btn-danger btn-xs" onclick="$.operate.remove(\'' + row.id + '\')"><i class="fa fa-remove"></i>删除</a>');
+                        }
+                        return actions.join('');
+                    }
+                }
+            ]
+        });
+
+        $.table.search();
+    });
+
+    function searchData() {
+        $.table.search({
+            batchNo: $("#batchNo").val()
+        });
+    }
+</script>
+</body>
+</html>

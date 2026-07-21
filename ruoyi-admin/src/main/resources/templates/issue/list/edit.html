@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('修改问题通报')" />
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox float-e-margins">
+                    <div class="ibox-title">
+                        <h5>修改问题通报</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <form class="form-horizontal" id="form-issue-edit">
+                            <input type="hidden" name="id" th:value="${issueReport.id}" />
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">业务线条：</label>
+                                <div class="col-sm-8">
+                                    <select name="businessLine" class="form-control" required>
+                                        <option value="">请选择</option>
+                                        <option value="政工" th:selected="${issueReport.businessLine == '政工'}">政工</option>
+                                        <option value="狱政" th:selected="${issueReport.businessLine == '狱政'}">狱政</option>
+                                        <option value="教育" th:selected="${issueReport.businessLine == '教育'}">教育</option>
+                                        <option value="生产" th:selected="${issueReport.businessLine == '生产'}">生产</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">时间：</label>
+                                <div class="col-sm-8">
+                                    <input type="date" name="issueDate" class="form-control"
+                                        th:value="${issueReport.issueDate}" required />
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">问题：</label>
+                                <div class="col-sm-8">
+                                    <textarea name="problem" class="form-control" rows="3"
+                                        th:text="${issueReport.problem}" required></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">对策：</label>
+                                <div class="col-sm-8">
+                                    <textarea name="solution" class="form-control" rows="3"
+                                        th:text="${issueReport.solution}"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">来源：</label>
+                                <div class="col-sm-8">
+                                    <select name="source" class="form-control" required>
+                                        <option value="">请选择</option>
+                                        <option value="警务督察" th:selected="${issueReport.source == '警务督察'}">警务督察</option>
+                                        <option value="三人小组" th:selected="${issueReport.source == '三人小组'}">三人小组</option>
+                                        <option value="值班组" th:selected="${issueReport.source == '值班组'}">值班组</option>
+                                        <option value="指挥中心" th:selected="${issueReport.source == '指挥中心'}">指挥中心</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">备注：</label>
+                                <div class="col-sm-8">
+                                    <textarea name="remark" class="form-control" rows="2"
+                                        th:text="${issueReport.remark}"></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="col-sm-offset-3 col-sm-8">
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                    <button type="button" class="btn btn-default" onclick="$.modal.close()">取消</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = "/issue/list";
+
+        $(function () {
+            $("#form-issue-edit").validate({
+                rules: {
+                    businessLine: { required: true },
+                    issueDate: { required: true },
+                    problem: { required: true },
+                    source: { required: true }
+                },
+                submitHandler: function (form) {
+                    var formData = $(form).serialize();
+                    $.ajax({
+                        url: prefix + "/edit",
+                        type: "POST",
+                        data: formData,
+                        success: function (res) {
+                            if (res.code == 0) {
+                                $.modal.close();
+                                $.table.refresh();
+                            } else {
+                                alert("保存失败：" + res.msg);
+                            }
+                        },
+                        error: function () {
+                            alert("保存失败，请检查网络");
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

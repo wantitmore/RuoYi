@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.posneg.mapper.PositiveNegativeMapper">
+    
+    <resultMap type="PositiveNegative" id="PositiveNegativeResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="category"    column="category"    />
+        <result property="situation"    column="situation"    />
+        <result property="suggestion"    column="suggestion"    />
+        <result property="count"    column="count"    />
+        <result property="batchNo"    column="batch_no"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectPositiveNegativeVo">
+        select id, user_id, category, situation, suggestion, count, batch_no, create_by, create_time, update_by, update_time from positive_negative
+    </sql>
+
+    <select id="selectPositiveNegativeList" parameterType="PositiveNegative" resultMap="PositiveNegativeResult">
+        <include refid="selectPositiveNegativeVo"/>
+        <where>  
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="category != null  and category != ''"> and category = #{category}</if>
+            <if test="situation != null  and situation != ''"> and situation = #{situation}</if>
+            <if test="suggestion != null  and suggestion != ''"> and suggestion = #{suggestion}</if>
+            <if test="count != null "> and count = #{count}</if>
+            <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="category != null and category != ''">AND category = #{category}</if>
+        </where>
+        <choose>
+        <when test="category != null and category != ''">
+            ORDER BY count DESC
+        </when>
+        <otherwise>
+            ORDER BY FIELD(category, '正面', '负面'), count DESC
+        </otherwise>
+        </choose>
+    </select>
+    
+    <select id="selectPositiveNegativeById" parameterType="Long" resultMap="PositiveNegativeResult">
+        <include refid="selectPositiveNegativeVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertPositiveNegative" parameterType="PositiveNegative" useGeneratedKeys="true" keyProperty="id">
+        insert into positive_negative
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="category != null and category != ''">category,</if>
+            <if test="situation != null">situation,</if>
+            <if test="suggestion != null">suggestion,</if>
+            <if test="count != null">count,</if>
+            <if test="batchNo != null and batchNo != ''">batch_no,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="category != null and category != ''">#{category},</if>
+            <if test="situation != null">#{situation},</if>
+            <if test="suggestion != null">#{suggestion},</if>
+            <if test="count != null">#{count},</if>
+            <if test="batchNo != null and batchNo != ''">#{batchNo},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updatePositiveNegative" parameterType="PositiveNegative">
+        update positive_negative
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="category != null and category != ''">category = #{category},</if>
+            <if test="situation != null">situation = #{situation},</if>
+            <if test="suggestion != null">suggestion = #{suggestion},</if>
+            <if test="count != null">count = #{count},</if>
+            <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deletePositiveNegativeById" parameterType="Long">
+        delete from positive_negative where id = #{id}
+    </delete>
+
+    <delete id="deletePositiveNegativeByIds" parameterType="String">
+        delete from positive_negative where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

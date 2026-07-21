@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('新增正负面清单')" />
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox float-e-margins">
+                    <div class="ibox-title">
+                        <h5>新增正负面清单</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <form class="form-horizontal" id="form-positive-negative-add">
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">姓名：</label>
+                                <div class="col-sm-8">
+                                    <select name="userId" class="form-control" required>
+                                        <option value="">请选择人员</option>
+                                        <option th:each="user : ${users}" th:value="${user.userId}"
+                                            th:text="${user.userName}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">类别：</label>
+                                <div class="col-sm-8">
+                                    <select name="category" class="form-control" required>
+                                        <option value="">请选择类别</option>
+                                        <option value="正面">正面</option>
+                                        <option value="负面">负面</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">情形：</label>
+                                <div class="col-sm-8">
+                                    <textarea name="situation" class="form-control" rows="3" required></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">结果运用建议：</label>
+                                <div class="col-sm-8">
+                                    <textarea name="suggestion" class="form-control" rows="3" required></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">次数：</label>
+                                <div class="col-sm-8">
+                                    <input type="number" name="count" class="form-control" value="1" min="1" required />
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-3 control-label">月份：</label>
+                                <div class="col-sm-8">
+                                    <input type="month" name="batchNo" class="form-control" required />
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="col-sm-offset-3 col-sm-8">
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                    <button type="button" class="btn btn-default" onclick="$.modal.close()">取消</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = "/posneg/pos_nega";
+
+        $(function () {
+            var now = new Date();
+            var year = now.getFullYear();
+            var monthIndex = now.getMonth() - 1; // 上个月的索引
+            if (monthIndex < 0) {
+                year--;
+                monthIndex = 11;
+            }
+            var month = year + '-' + ('0' + (monthIndex + 1)).slice(-2);
+            $("input[name='batchNo']").val(month);
+
+            $("#form-positive-negative-add").validate({
+                rules: {
+                    userId: { required: true },
+                    category: { required: true },
+                    situation: { required: true },
+                    suggestion: { required: true },
+                    count: { required: true, min: 1 },
+                    batchNo: { required: true }
+                },
+                submitHandler: function (form) {
+                    var formData = $(form).serialize();
+                    $.ajax({
+                        url: prefix + "/add",
+                        type: "POST",
+                        data: formData,
+                        success: function (res) {
+                            if (res.code == 0) {
+                                $.modal.close();          // 关闭弹窗
+                                $.table.refresh();        // 刷新列表
+                            } else {
+                                alert("保存失败：" + res.msg);
+                            }
+                        },
+                        error: function () {
+                            alert("保存失败，请检查网络");
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

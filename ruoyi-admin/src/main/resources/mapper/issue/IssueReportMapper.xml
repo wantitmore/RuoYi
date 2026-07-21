@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.issue.mapper.IssueReportMapper">
+    
+    <resultMap type="IssueReport" id="IssueReportResult">
+        <result property="id"    column="id"    />
+        <result property="businessLine"    column="business_line"    />
+        <result property="issueDate"    column="issue_date"    />
+        <result property="problem"    column="problem"    />
+        <result property="solution"    column="solution"    />
+        <result property="source"    column="source"    />
+        <result property="remark"    column="remark"    />
+        <result property="batchNo"    column="batch_no"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectIssueReportVo">
+        select id, business_line, issue_date, problem, solution, source, remark, batch_no, create_by, create_time, update_by, update_time from issue_report
+    </sql>
+
+    <select id="selectIssueReportList" parameterType="IssueReport" resultMap="IssueReportResult">
+        <include refid="selectIssueReportVo"/>
+        <where>  
+            <if test="businessLine != null  and businessLine != ''"> and business_line = #{businessLine}</if>
+            <if test="issueDate != null "> and issue_date = #{issueDate}</if>
+            <if test="problem != null  and problem != ''"> and problem = #{problem}</if>
+            <if test="solution != null  and solution != ''"> and solution = #{solution}</if>
+            <if test="source != null  and source != ''"> and source = #{source}</if>
+            <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="deptId != null">AND dept_id = #{deptId}</if>
+        </where>
+    </select>
+    
+    <select id="selectIssueReportById" parameterType="Long" resultMap="IssueReportResult">
+        <include refid="selectIssueReportVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertIssueReport" parameterType="IssueReport" useGeneratedKeys="true" keyProperty="id">
+        insert into issue_report
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="businessLine != null and businessLine != ''">business_line,</if>
+            <if test="issueDate != null">issue_date,</if>
+            <if test="problem != null">problem,</if>
+            <if test="solution != null">solution,</if>
+            <if test="source != null and source != ''">source,</if>
+            <if test="remark != null">remark,</if>
+            <if test="batchNo != null and batchNo != ''">batch_no,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="deptId != null">dept_id,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="businessLine != null and businessLine != ''">#{businessLine},</if>
+            <if test="issueDate != null">#{issueDate},</if>
+            <if test="problem != null">#{problem},</if>
+            <if test="solution != null">#{solution},</if>
+            <if test="source != null and source != ''">#{source},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="batchNo != null and batchNo != ''">#{batchNo},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="deptId != null">#{deptId},</if>
+         </trim>
+    </insert>
+
+    <update id="updateIssueReport" parameterType="IssueReport">
+        update issue_report
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="businessLine != null and businessLine != ''">business_line = #{businessLine},</if>
+            <if test="issueDate != null">issue_date = #{issueDate},</if>
+            <if test="problem != null">problem = #{problem},</if>
+            <if test="solution != null">solution = #{solution},</if>
+            <if test="source != null and source != ''">source = #{source},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteIssueReportById" parameterType="Long">
+        delete from issue_report where id = #{id}
+    </delete>
+
+    <delete id="deleteIssueReportByIds" parameterType="String">
+        delete from issue_report where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.kpi.mapper.KpiItemMapper">
+    
+ <resultMap type="KpiItem" id="KpiItemResult">
+        <result property="id"    column="id"    />
+        <result property="name"    column="name"    />
+        <result property="maxScore"    column="max_score"    />
+        <result property="scoreType"    column="score_type"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="category" column="category"/>
+    </resultMap>
+
+    <sql id="selectKpiItemVo">
+        select id, name, max_score, score_type, remark, create_by, create_time, update_by, update_time, dept_id,category from kpi_item
+    </sql>
+
+    <select id="selectKpiItemList" parameterType="KpiItem" resultMap="KpiItemResult">
+        <include refid="selectKpiItemVo"/>
+        <where>  
+            <if test="name != null  and name != ''"> and name like concat('%', #{name}, '%')</if>
+            <if test="maxScore != null "> and max_score = #{maxScore}</if>
+            <if test="scoreType != null  and scoreType != ''"> and score_type = #{scoreType}</if>
+            <if test="deptId != null "> and dept_id = #{deptId}</if>
+            <if test="category != null and category != ''">and category = #{category}</if>
+            <!-- and category = #{category} -->
+        </where>
+    </select>
+    
+    <select id="selectKpiItemById" parameterType="Long" resultMap="KpiItemResult">
+        <include refid="selectKpiItemVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertKpiItem" parameterType="KpiItem" useGeneratedKeys="true" keyProperty="id">
+        insert into kpi_item
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">name,</if>
+            <if test="maxScore != null">max_score,</if>
+            <if test="scoreType != null">score_type,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="deptId != null">dept_id,</if>
+            <if test="category != null and category != ''">category,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="name != null and name != ''">#{name},</if>
+            <if test="maxScore != null">#{maxScore},</if>
+            <if test="scoreType != null">#{scoreType},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="deptId != null">#{deptId},</if>
+            <if test="category != null and category != ''">#{category},</if>
+         </trim>
+    </insert>
+
+    <update id="updateKpiItem" parameterType="KpiItem">
+        update kpi_item
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="maxScore != null">max_score = #{maxScore},</if>
+            <if test="scoreType != null">score_type = #{scoreType},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="category != null and category != ''">category = #{category},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteKpiItemById" parameterType="Long">
+        delete from kpi_item where id = #{id}
+    </delete>
+
+    <delete id="deleteKpiItemByIds" parameterType="String">
+        delete from kpi_item where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,142 @@
+<!-- 这是考核结果页面 -->
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head th:include="include :: header('考核结果汇总')"></head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>考核结果汇总</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <div class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">月份：</label>
+                                <div class="col-sm-2">
+                                    <input type="month" id="batchNo" class="form-control" />
+                                </div>
+                                <label class="col-sm-1 control-label">部门：</label>
+                                <div class="col-sm-2">
+                                    <select id="deptSelect" class="form-control">
+                                        <option value="">全部部门</option>
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
+                                <label class="col-sm-1 control-label">岗位：</label>
+                                <div class="col-sm-2">
+                                    <select id="postSelect" class="form-control">
+                                        <option value="">全部岗位</option>
+                                        <option th:each="post : ${posts}" th:value="${post.postId}"
+                                            th:text="${post.postName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-2">
+                                    <button type="button" class="btn btn-primary" onclick="search()">
+                                        <i class="fa fa-search"></i> 查询
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="summaryTable" class="table table-bordered table-hover" style="display:none;">
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>被考核人</th>
+                                        <th>部门</th>
+                                        <th>总分</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="summaryBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var isAdmin = /*[[${isAdmin}]]*/ true;
+        var currentDeptId = /*[[${currentDeptId}]]*/ null;
+        var currentDeptName = /*[[${currentDeptName}]]*/ '';
+        var ctx = [[@{/}]];
+
+        // 初始化月份和部门
+        $(function () {
+            // 设置当月
+            var now = new Date();
+            var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+            $("#batchNo").val(month);
+            if (!isAdmin && currentDeptName && currentDeptName !== '') {
+                $("#deptSelect").hide();
+                $("#deptSelect").prev("label").hide();
+                $("#deptSelect").after('<span class="form-control-static" style="margin-left:10px;font-weight:bold;padding-top:7px;display:inline-block;">' + currentDeptName + '</span>');
+            }
+        });
+
+        function search() {
+            var batchNoEl = document.getElementById("batchNo");
+            var deptIdEl;
+            var postId;
+            if (!isAdmin) {
+                // 普通用户：强制使用自己的部门ID
+                deptIdEl = currentDeptId;
+            } else {
+                // 管理员：从下拉框获取
+                deptIdEl = document.getElementById("deptSelect").value;
+            }
+            postId = document.getElementById("postSelect").value;
+            if (!batchNoEl || !deptIdEl) {
+                alert("页面元素未加载完成，请刷新后重试");
+                return;
+            }
+
+            var batchNo = batchNoEl.value;
+            var deptId = deptIdEl.value;
+
+            if (!batchNo) {
+                alert("请选择月份");
+                return;
+            }
+
+            var url = ctx + "kpi/score/summary/data?batchNo=" + encodeURIComponent(batchNo);
+            if (deptId && deptId !== "") {
+                url += "&deptId=" + encodeURIComponent(deptId);
+            }
+            if (postId && postId !== "") {
+                url += "&postId=" + encodeURIComponent(postId);
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(res => {
+                    if (res.code != 0) {
+                        alert("查询失败：" + res.msg);
+                        return;
+                    }
+                    var data = res.data;
+                    var html = "";
+                    for (var i = 0; i < data.length; i++) {
+                        var row = data[i];
+                        html += '<tr>';
+                        html += '<td>' + (i + 1) + '</td>';
+                        html += '<td>' + row.userName + '</td>';
+                        html += '<td>' + row.deptName + '</td>';
+                        html += '<td>' + row.totalScore + '</td>';
+                        html += '</tr>';
+                    }
+                    document.getElementById("summaryBody").innerHTML = html;
+                    document.getElementById("summaryTable").style.display = "";
+                })
+                .catch(err => alert("请求失败：" + err.message));
+        }
+    </script>
+</body>
+
+</html>

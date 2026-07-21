@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('修改考核项目')" />
+</head>
+
+<body class="white-bg">
+    <div class="wrapper wrapper-content animated fadeInRight ibox-content">
+        <form class="form-horizontal m" id="form-item-edit" th:object="${kpiItem}">
+            <input th:field="*{id}" type="hidden">
+            <div class="col-xs-12">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">考核项目名称：</label>
+                    <div class="col-sm-8">
+                        <input name="name" th:field="*{name}" class="form-control" type="text" required>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-12">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label is-required">满分：</label>
+                    <div class="col-sm-8">
+                        <input name="maxScore" th:field="*{maxScore}" class="form-control" type="text" required>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-12">
+                <div class="form-group">
+                    <label class="col-sm-3 control-label">备注：</label>
+                    <div class="col-sm-8">
+                        <textarea name="remark" class="form-control">[[*{remark}]]</textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">所属部门：</label>
+                <div class="col-sm-8">
+                    <!-- 普通管理员：隐藏域+只读文本框 -->
+                    <th:block th:if="${deptDisabled}">
+                        <input type="hidden" name="deptId" th:value="${kpiItem.deptId}">
+                        <input type="text" class="form-control" th:value="${deptName}" readonly>
+                    </th:block>
+                    <!-- 超级管理员：下拉选择框，回显选中 -->
+                    <th:block th:unless="${deptDisabled}">
+                        <select name="deptId" class="form-control" required>
+                            <option value="">请选择部门</option>
+                            <option th:each="dept : ${depts}" th:value="${dept.deptId}" th:text="${dept.deptName}"
+                                th:selected="${dept.deptId == kpiItem.deptId}"></option>
+                        </select>
+                    </th:block>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-3 control-label">考核类别：</label>
+                <div class="col-sm-8">
+                    <select name="category" class="form-control" required>
+                        <option value="">请选择类别</option>
+                        <option value="狱政" th:attr="selected=${kpiItem.category == '狱政'} ? 'selected' : null">狱政
+                        </option>
+                        <option value="纪律作风" th:attr="selected=${kpiItem.category == '纪律作风'} ? 'selected' : null">纪律作风
+                        </option>
+                        <option value="生产" th:attr="selected=${kpiItem.category == '生产'} ? 'selected' : null">生产
+                        </option>
+                        <option value="教育" th:attr="selected=${kpiItem.category == '教育'} ? 'selected' : null">教育
+                        </option>
+                        <option value="执勤现场管理" th:attr="selected=${kpiItem.category == '执勤现场管理'} ? 'selected' : null">执勤现场管理
+                        </option>
+                        <option value="正负面清单" th:attr="selected=${kpiItem.category == '正负面清单'} ? 'selected' : null">正负面清单
+                        </option>
+                        <option value="动态档案评价" th:attr="selected=${kpiItem.category == '动态档案评价'} ? 'selected' : null">动态档案评价
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var prefix = ctx + "kpi/item";
+        $("#form-item-edit").validate({
+            focusCleanup: true
+        });
+
+        function submitHandler() {
+            if ($.validate.form()) {
+                $.operate.save(prefix + "/edit", $('#form-item-edit').serialize());
+            }
+        }
+    </script>
+</body>
+
+</html>

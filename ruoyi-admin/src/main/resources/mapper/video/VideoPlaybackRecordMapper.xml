@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.video.mapper.VideoPlaybackRecordMapper">
+    
+    <resultMap type="VideoPlaybackRecord" id="VideoPlaybackRecordResult">
+        <result property="id"    column="id"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="playbackStatus"    column="playback_status"    />
+        <result property="batchNo"    column="batch_no"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectVideoPlaybackRecordVo">
+        select id, item_id, playback_status, batch_no, dept_id, create_by, create_time, update_by, update_time from video_playback_record
+    </sql>
+
+    <select id="selectVideoPlaybackRecordList" parameterType="VideoPlaybackRecord" resultMap="VideoPlaybackRecordResult">
+        <include refid="selectVideoPlaybackRecordVo"/>
+        <where>  
+            <if test="itemId != null "> and item_id = #{itemId}</if>
+            <if test="playbackStatus != null  and playbackStatus != ''"> and playback_status = #{playbackStatus}</if>
+            <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="deptId != null "> and dept_id = #{deptId}</if>
+        </where>
+    </select>
+    
+    <select id="selectVideoPlaybackRecordById" parameterType="Long" resultMap="VideoPlaybackRecordResult">
+        <include refid="selectVideoPlaybackRecordVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertVideoPlaybackRecord" parameterType="VideoPlaybackRecord" useGeneratedKeys="true" keyProperty="id">
+        insert into video_playback_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="itemId != null">item_id,</if>
+            <if test="playbackStatus != null">playback_status,</if>
+            <if test="batchNo != null and batchNo != ''">batch_no,</if>
+            <if test="deptId != null">dept_id,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="itemId != null">#{itemId},</if>
+            <if test="playbackStatus != null">#{playbackStatus},</if>
+            <if test="batchNo != null and batchNo != ''">#{batchNo},</if>
+            <if test="deptId != null">#{deptId},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateVideoPlaybackRecord" parameterType="VideoPlaybackRecord">
+        update video_playback_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="playbackStatus != null">playback_status = #{playbackStatus},</if>
+            <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteVideoPlaybackRecordById" parameterType="Long">
+        delete from video_playback_record where id = #{id}
+    </delete>
+
+    <delete id="deleteVideoPlaybackRecordByIds" parameterType="String">
+        delete from video_playback_record where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

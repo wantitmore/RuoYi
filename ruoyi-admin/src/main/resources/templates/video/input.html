@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head th:include="include :: header('视频回放录入')">
+    <link th:href="@{/css/style.css}" rel="stylesheet" />
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>视频回放录入</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <div class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">月份：</label>
+                                <div class="col-sm-2">
+                                    <input type="month" id="batchNo" class="form-control" />
+                                </div>
+                                <div class="col-sm-2">
+                                    <button class="btn btn-primary" onclick="loadData()">
+                                        <i class="fa fa-search"></i> 加载/刷新
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive" style="display:none;" id="tableWrapper">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">序号</th>
+                                        <th>倒查位置</th>
+                                        <th>具体内容</th>
+                                        <th>回放情况</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                            <div class="text-center" style="margin-top:20px;">
+                                <button class="btn btn-success" id="saveBtn" onclick="saveData()" style="display:none;">
+                                    <i class="fa fa-save"></i> 保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var canEdit = [[${ canEdit }]];
+
+        $(function () {
+            var now = new Date();
+            var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+            $("#batchNo").val(month);
+        });
+
+        function loadData() {
+            var batchNo = $("#batchNo").val();
+            if (!batchNo) { alert("请选择月份"); return; }
+            $.get(ctx + "video/record/load", { batchNo: batchNo }, function (res) {
+                if (res.code != 0) { alert("加载失败"); return; }
+                var items = res.data.items;
+                var records = res.data.records;
+                var html = '';
+                var readonlyAttr = canEdit ? '' : 'readonly';
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    var recordValue = records[item.id] || '';
+                    html += '<tr>';
+                    html += '<td>' + (i + 1) + '</td>';
+                    html += '<td>' + item.checkPosition + '</td>';
+                    html += '<td>' + item.specificContent + '</td>';
+                    html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3" ' + readonlyAttr + '>' + recordValue + '</textarea></td>';
+                    html += '</tr>';
+                }
+                $("#tableBody").html(html);
+                $("#tableWrapper").show();
+                if (canEdit) {
+                    $("#saveBtn").show();
+                }
+            });
+        }
+
+        function saveData() {
+            var batchNo = $("#batchNo").val();
+            if (!batchNo) { alert("请选择月份"); return; }
+            var recordList = [];
+            $("#tableBody textarea").each(function () {
+                var itemId = $(this).data('item-id');
+                var value = $(this).val();
+                if (value && value.trim() !== '') {
+                    recordList.push({
+                        itemId: itemId,
+                        playbackStatus: value,
+                        batchNo: batchNo
+                    });
+                }
+            });
+            if (recordList.length === 0) { alert("没有可保存的记录"); return; }
+            $.ajax({
+                url: ctx + "video/record/save",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(recordList),
+                success: function (res) {
+                    if (res.code == 0) alert("保存成功！");
+                    else alert("保存失败：" + res.msg);
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

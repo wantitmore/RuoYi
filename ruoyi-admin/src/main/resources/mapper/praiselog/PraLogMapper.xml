@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.praiselog.mapper.PraLogMapper">
+    
+    <resultMap type="PraLog" id="PraLogResult">
+        <result property="id"    column="id"    />
+        <result property="dutyDate"    column="duty_date"    />
+        <result property="detail"    column="detail"    />
+        <result property="police"    column="police"    />
+        <result property="batchNo"    column="batch_no"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectPraLogVo">
+        select id, duty_date, detail, police, batch_no, create_by, create_time, update_by, update_time from pra_log
+    </sql>
+
+    <select id="selectPraLogList" parameterType="PraLog" resultMap="PraLogResult">
+        <include refid="selectPraLogVo"/>
+        <where>  
+            <if test="dutyDate != null "> and duty_date = #{dutyDate}</if>
+            <if test="detail != null  and detail != ''"> and detail = #{detail}</if>
+            <if test="police != null  and police != ''"> and police = #{police}</if>
+           <if test="batchNo != null and batchNo != ''">and batch_no = #{batchNo}</if>
+           <if test="deptId != null">AND dept_id = #{deptId}</if>
+        </where>
+    </select>
+    
+    <select id="selectPraLogById" parameterType="Long" resultMap="PraLogResult">
+        <include refid="selectPraLogVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertPraLog" parameterType="PraLog" useGeneratedKeys="true" keyProperty="id">
+        insert into pra_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="dutyDate != null">duty_date,</if>
+            <if test="detail != null">detail,</if>
+            <if test="police != null and police != ''">police,</if>
+            batch_no,
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="deptId != null">dept_id,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="dutyDate != null">#{dutyDate},</if>
+            <if test="detail != null">#{detail},</if>
+            <if test="police != null and police != ''">#{police},</if>
+            #{batchNo},
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="deptId != null">#{deptId},</if>
+         </trim>
+    </insert>
+
+    <update id="updatePraLog" parameterType="PraLog">
+        update pra_log
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="dutyDate != null">duty_date = #{dutyDate},</if>
+            <if test="detail != null">detail = #{detail},</if>
+            <if test="police != null and police != ''">police = #{police},</if>
+            batch_no = #{batchNo},
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deletePraLogById" parameterType="Long">
+        delete from pra_log where id = #{id}
+    </delete>
+
+    <delete id="deletePraLogByIds" parameterType="String">
+        delete from pra_log where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.video.mapper.VideoCheckItemMapper">
+    
+    <resultMap type="VideoCheckItem" id="VideoCheckItemResult">
+        <result property="id"    column="id"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="checkPosition"    column="check_position"    />
+        <result property="specificContent"    column="specific_content"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectVideoCheckItemVo">
+        select id, dept_id, check_position, specific_content, sort_order, create_by, create_time, update_by, update_time from video_check_item
+    </sql>
+
+    <select id="selectVideoCheckItemList" parameterType="VideoCheckItem" resultMap="VideoCheckItemResult">
+        <include refid="selectVideoCheckItemVo"/>
+        <where>  
+            <if test="deptId != null "> and dept_id = #{deptId}</if>
+            <if test="checkPosition != null  and checkPosition != ''"> and check_position = #{checkPosition}</if>
+            <if test="specificContent != null  and specificContent != ''"> and specific_content = #{specificContent}</if>
+            <if test="sortOrder != null "> and sort_order = #{sortOrder}</if>
+        </where>
+    </select>
+    
+    <select id="selectVideoCheckItemById" parameterType="Long" resultMap="VideoCheckItemResult">
+        <include refid="selectVideoCheckItemVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertVideoCheckItem" parameterType="VideoCheckItem" useGeneratedKeys="true" keyProperty="id">
+        insert into video_check_item
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="deptId != null">dept_id,</if>
+            <if test="checkPosition != null and checkPosition != ''">check_position,</if>
+            <if test="specificContent != null and specificContent != ''">specific_content,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="deptId != null">#{deptId},</if>
+            <if test="checkPosition != null and checkPosition != ''">#{checkPosition},</if>
+            <if test="specificContent != null and specificContent != ''">#{specificContent},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateVideoCheckItem" parameterType="VideoCheckItem">
+        update video_check_item
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="checkPosition != null and checkPosition != ''">check_position = #{checkPosition},</if>
+            <if test="specificContent != null and specificContent != ''">specific_content = #{specificContent},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteVideoCheckItemById" parameterType="Long">
+        delete from video_check_item where id = #{id}
+    </delete>
+
+    <delete id="deleteVideoCheckItemByIds" parameterType="String">
+        delete from video_check_item where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

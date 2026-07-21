@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head th:include="include :: header('考核打分')">
+    <link th:href="@{/css/style.css}" rel="stylesheet" />
+</head>
+
+<body class="gray-bg">
+    <style>
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .score-table {
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .score-row {
+            display: flex;
+            flex-wrap: nowrap;
+            border-bottom: 1px solid #e7eaec;
+        }
+
+        .score-cell {
+            flex-shrink: 0;
+            padding: 6px 4px;
+            text-align: center;
+            vertical-align: middle;
+            word-wrap: break-word;
+            white-space: normal;
+            box-sizing: border-box;
+            border-right: 1px solid #e7eaec;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .score-cell.item:nth-child(even) {
+            background-color: #edf4fa;
+        }
+
+        .score-cell.item:nth-child(odd) {
+            background-color: #ffffff;
+        }
+
+        .score-cell.person {
+            width: 80px;
+        }
+
+        .score-cell.item {
+            width: 130px;
+        }
+
+        .score-cell.total {
+            width: 80px;
+        }
+
+        .score-header .score-cell {
+            font-weight: bold;
+            background-color: #f5f5f5;
+            flex-direction: column;
+        }
+
+        .score-input {
+            width: 100%;
+            text-align: center;
+            background-color: transparent;
+        }
+
+        /* 备注图标 */
+        .remark-icon {
+            cursor: pointer;
+            color: #999;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .remark-icon.has-remark {
+            color: #337ab7;
+            background-color: #e6f0fa;
+        }
+
+        .remark-icon:hover {
+            background-color: #d9e8f5;
+        }
+
+        /* 悬浮弹窗 */
+        .remark-popover {
+            position: fixed;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            width: 280px;
+            display: none;
+        }
+
+        .remark-popover textarea {
+            width: 100%;
+            height: 60px;
+            resize: vertical;
+            margin-bottom: 8px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .remark-popover .btn-row {
+            text-align: right;
+        }
+
+        .remark-popover .btn-row button {
+            margin-left: 6px;
+        }
+    </style>
+
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox float-e-margins">
+                    <div class="ibox-title">
+                        <h5>考核打分</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <!-- 筛选区 -->
+                        <div class="row form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">部门：</label>
+                                <div class="col-sm-2">
+                                    <select id="deptSelect" class="form-control">
+                                        <option value="">请选择部门</option>
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
+                                <label class="col-sm-1 control-label">月份：</label>
+                                <div class="col-sm-2">
+                                    <input type="month" id="batchNo" class="form-control" />
+                                </div>
+                                <label class="col-sm-1 control-label">类别：</label>
+                                <div class="col-sm-2">
+                                    <select id="categorySelect" class="form-control">
+                                        <option value="">全部类别</option>
+                                        <option value="纪律作风">纪律作风</option>
+                                        <option value="狱政">狱政</option>
+                                        <option value="生产">生产</option>
+                                        <option value="教育">教育</option>
+                                        <option value="执勤现场管理">执勤现场管理</option>
+                                        <option value="正负面清单">正负面清单</option>
+                                        <option value="动态档案评价">动态档案评价</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-2">
+                                    <button type="button" class="btn btn-primary" onclick="loadTable()">
+                                        <i class="fa fa-search"></i> 加载人员
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 打分表格（flex布局） -->
+                        <div class="table-responsive" style="display:none;" id="scoreTableWrapper">
+                            <div class="score-table" id="scoreTable"></div>
+                        </div>
+
+                        <!-- 提交按钮 -->
+                        <div class="text-center" style="margin-top:20px; display:none;" id="submitDiv">
+                            <button type="button" class="btn btn-success" onclick="submitScores()">
+                                <i class="fa fa-check"></i> 批量保存
+                            </button>
+                        </div>
+
+                        <!-- 备注悬浮弹窗（全局公用） -->
+                        <div id="remarkPopover" class="remark-popover">
+                            <textarea id="remarkTextarea" placeholder="请输入打分理由"></textarea>
+                            <div class="btn-row">
+                                <button class="btn btn-xs btn-default" onclick="closeRemarkPopover()">取消</button>
+                                <button class="btn btn-xs btn-primary" onclick="saveRemarkPopover()">确定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        window.remarkCache = window.remarkCache || {}; // 挂载到 window，确保绝对全局可访问
+        var currentEditKey = null;     // 当前正在编辑的 key
+        window.currentEditKey = window.currentEditKey || null;
+        var canEdit = false;
+        // 页面初始化：设置当月
+        $(function () {
+            var now = new Date();
+            var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+            $("#batchNo").val(month);
+            var currentDeptId = [[${ currentDeptId != null ? currentDeptId : 'null'}]];
+        if (currentDeptId && currentDeptId !== 'null') {
+            $("#deptSelect").val(currentDeptId);
+        }
+        });
+
+        function loadTable() {
+            var deptId = $("#deptSelect").val();
+            var batchNo = $("#batchNo").val();
+            var category = $("#categorySelect").val();
+            if (!deptId || !batchNo) {
+                alert("请选择部门和填写月份");
+                return;
+            }
+
+            $.get(ctx + "kpi/score/loadScoreTable", {
+                deptId: deptId,
+                batchNo: batchNo,
+                category: category
+            }, function (res) {
+                if (res.code != 0) {
+                    alert("加载失败：" + res.msg);
+                    return;
+                }
+                var items = res.data.items;
+                var users = res.data.users;
+                var scoreMap = res.data.scoreMap;
+                canEdit = res.data.canEdit;
+                if (!users || users.length === 0) {
+                    alert("该部门下没有人员");
+                    return;
+                }
+
+                // 1. 清空并初始化备注缓存
+                remarkCache = {};
+                for (var key in scoreMap) {
+                    var data = scoreMap[key];
+                    if (data && data.remark) {
+                        remarkCache[key] = data.remark;
+                    }
+                }
+
+                // 2. 构建表格 HTML
+                var html = '';
+
+                // 表头行
+                html += '<div class="score-row score-header">';
+                html += '<div class="score-cell person">人员</div>';
+                for (var i = 0; i < items.length; i++) {
+                    html += '<div class="score-cell item">' + items[i].name +
+                        '<br><span style="font-size:10px;color:#888;">[' + items[i].category + ']</span></div>';
+                }
+                html += '<div class="score-cell total">总分</div>';
+                html += '</div>';
+
+                // 数据行
+                for (var u = 0; u < users.length; u++) {
+                    var user = users[u];
+                    html += '<div class="score-row" data-user-id="' + user.userId + '">';
+                    html += '<div class="score-cell person">' + user.userName + '</div>';
+                    var total = 0;
+                    for (var j = 0; j < items.length; j++) {
+                        var key = user.userId + '_' + items[j].id;
+                        var scoreData = scoreMap[key];
+                        var existingScore = '';
+                        var existingRemark = '';
+                        if (scoreData && typeof scoreData === 'object') {
+                            existingScore = scoreData.score != null ? scoreData.score : '';
+                            existingRemark = scoreData.remark || '';
+                        }
+                        if (existingScore !== '') total += parseFloat(existingScore);
+
+                        var iconClass = existingRemark ? 'remark-icon has-remark' : 'remark-icon';
+
+                        // 重要：在这里定义 readonlyAttr
+                        var readonlyAttr = canEdit ? '' : 'readonly';
+
+                        html += '<div class="score-cell item">' +
+                            '<div style="display:flex; align-items:center; gap:4px;">' +
+                            '<input type="number" class="form-control score-input" ' +
+                            'data-item-id="' + items[j].id + '" ' +
+                            'max="' + items[j].maxScore + '" min="0" step="0.5" ' +
+                            'placeholder="0-' + items[j].maxScore + '" ' +
+                            'value="' + existingScore + '" ' +
+                            readonlyAttr + ' style="flex:1;">' +
+                            '<i class="fa fa-commenting-o ' + iconClass + '" ' +
+                            'data-item-id="' + items[j].id + '" ' +
+                            'data-remark="' + (existingRemark || '') + '" ' +
+                            'onclick="openRemarkPopover(this, \'' + user.userId + '\', \'' + items[j].id + '\')" ' +
+                            'style="cursor:pointer; font-size:16px; flex-shrink:0;"></i>' +
+                            '</div>' +
+                            '</div>';
+                    }
+                    html += '<div class="score-cell total total-score">' + (total > 0 ? total.toFixed(1) : '0') + '</div>';
+                    html += '</div>';
+                }
+
+                $("#scoreTable").html(html);
+                $("#scoreTableWrapper, #submitDiv").show();
+
+                // 绑定输入事件（总分计算 + 超限提醒）
+                $(".score-input").off('input').on('input', function () {
+                    var max = parseFloat($(this).attr('max'));
+                    var val = parseFloat($(this).val());
+                    if (!isNaN(val) && val > max) {
+                        $(this).css('background-color', '#ffe6e6');
+                    } else {
+                        $(this).css('background-color', '');
+                    }
+                    var row = $(this).closest('.score-row');
+                    var total = 0;
+                    row.find('.score-input').each(function () {
+                        var v = parseFloat($(this).val());
+                        if (!isNaN(v)) total += v;
+                    });
+                    row.find('.total-score').text(total.toFixed(1));
+                });
+            });
+        }
+
+        // ========== 备注弹窗相关函数 ==========
+
+        function openRemarkPopover(iconEl, userId, itemId) {
+            currentEditKey = userId + '_' + itemId;
+            // 从图标属性读取已有备注
+            var remark = $(iconEl).attr('data-remark') || '';
+            $("#remarkTextarea").val(remark);
+            // 根据权限控制编辑状态
+            if (canEdit) {
+                $("#remarkTextarea").prop("readonly", false);
+                $("#remarkPopover .btn-primary").show();   // 确定按钮显示
+            } else {
+                $("#remarkTextarea").prop("readonly", true);
+                $("#remarkPopover .btn-primary").hide();   // 确定按钮隐藏
+            }
+            // 定位弹窗
+            var popover = $("#remarkPopover");
+            var offset = $(iconEl).offset();
+            var left = offset.left - 130;
+            var top = offset.top + 20;
+            popover.css({ top: top, left: left }).show();
+            $("#remarkTextarea").focus();
+        }
+
+        function saveRemarkPopover() {
+            var remark = $("#remarkTextarea").val();
+            if (currentEditKey) {
+                var parts = currentEditKey.split('_');
+                if (parts.length === 2) {
+                    var rowEl = $('.score-row[data-user-id="' + parts[0] + '"]');
+                    var iconEl = rowEl.find('.remark-icon[data-item-id="' + parts[1] + '"]');
+                    if (remark && remark.trim() !== '') {
+                        iconEl.attr('data-remark', remark.trim());
+                        iconEl.addClass('has-remark');
+                    } else {
+                        iconEl.removeAttr('data-remark');
+                        iconEl.removeClass('has-remark');
+                    }
+                }
+            }
+            closeRemarkPopover();
+        }
+
+        function closeRemarkPopover() {
+            $("#remarkPopover").hide();
+            currentEditKey = null;
+        }
+
+        // 点击页面其他地方关闭弹窗
+        $(document).on('click', function (e) {
+            if (!$(e.target).closest('#remarkPopover').length &&
+                !$(e.target).hasClass('remark-icon')) {
+                closeRemarkPopover();
+            }
+        });
+
+        // 阻止弹窗内部点击事件冒泡
+        $('#remarkPopover').on('click', function (e) {
+            e.stopPropagation();
+        });
+
+        // ========== 提交保存 ==========
+
+        function submitScores() {
+            var batchNo = $("#batchNo").val();
+            var scoreList = [];
+            $(".score-row[data-user-id]").each(function () {
+                var userId = $(this).data('user-id');
+                $(this).find('.score-input').each(function () {
+                    var val = parseFloat($(this).val());
+                    if (!isNaN(val)) {
+                        var itemId = $(this).data('item-id');
+                        // 从同一单元格内的备注图标读取备注
+                        var iconEl = $(this).closest('.score-cell').find('.remark-icon');
+                        var remark = iconEl.attr('data-remark') || '';
+                        scoreList.push({
+                            userId: userId,
+                            itemId: itemId,
+                            score: val,
+                            batchNo: batchNo,
+                            remark: remark
+                        });
+                    }
+                });
+            });
+            if (scoreList.length === 0) {
+                alert("没有可提交的分数");
+                return;
+            }
+            $.ajax({
+                url: ctx + "kpi/score/saveBatch",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(scoreList),
+                success: function (res) {
+                    if (res.code == 0) {
+                        alert("保存成功！");
+                    } else {
+                        alert("保存失败：" + res.msg);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

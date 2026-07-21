@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<th:block th:fragment="main">
+    <style>
+        .welcome-area {
+            background-color: #f0f2f5;
+            min-height: 500px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .welcome-card {
+            background-color: #ffffff;
+            padding: 40px 60px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+        .welcome-card h2 {
+            font-size: 32px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .welcome-card p {
+            font-size: 18px;
+            color: #606266;
+            margin: 0;
+        }
+    </style>
+    <div class="welcome-area">
+        <div class="welcome-card">
+            <h2>欢迎使用河源监狱量化考核系统</h2>
+            <p>对党忠诚 服务人民 执法公正 纪律严明</p>
+        </div>
+    </div>
+</th:block>
+</html>

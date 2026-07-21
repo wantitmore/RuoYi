@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.kpi.mapper.KpiScoreMapper">
+    
+    <resultMap type="KpiScore" id="KpiScoreResult">
+        <result property="id"    column="id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="itemId"    column="item_id"    />
+        <result property="score"    column="score"    />
+        <result property="batchNo"    column="batch_no"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <select id="selectSummary" resultType="com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary">
+        SELECT 
+            u.user_name AS userName,
+            d.dept_name AS deptName,
+            p.post_name AS postName,
+            SUM(s.score) AS totalScore,
+            COUNT(s.id) AS itemCount
+        FROM kpi_score s
+        JOIN sys_user u ON u.user_id = s.user_id
+        JOIN sys_dept d ON u.dept_id = d.dept_id
+        LEFT JOIN sys_user_post up ON u.user_id = up.user_id
+        LEFT JOIN sys_post p ON up.post_id = p.post_id
+        WHERE s.batch_no = #{batchNo}
+        <if test="deptId != null">
+            AND u.dept_id = #{deptId}
+        </if>
+        <if test="postId != null">
+            AND up.post_id = #{postId}
+        </if>
+        GROUP BY u.user_id, u.user_name, d.dept_name, p.post_name
+        ORDER BY totalScore DESC
+    </select>
+
+    <sql id="selectKpiScoreVo">
+        select id, user_id, item_id, score, batch_no, remark, create_by, create_time, update_by, update_time 
+        from kpi_score
+    </sql>
+
+    <select id="selectKpiScoreList" parameterType="KpiScore" resultMap="KpiScoreResult">
+        <include refid="selectKpiScoreVo"/>
+        <where>  
+            <if test="userId != null "> and user_id = #{userId}</if>
+            <if test="itemId != null "> and item_id = #{itemId}</if>
+            <if test="score != null "> and score = #{score}</if>
+            <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
+            <if test="remark != null  and remark != ''"> and remark = #{remark}</if>
+        </where>
+    </select>
+    
+    <select id="selectKpiScoreById" parameterType="Long" resultMap="KpiScoreResult">
+        <include refid="selectKpiScoreVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertKpiScore" parameterType="KpiScore" useGeneratedKeys="true" keyProperty="id">
+        insert into kpi_score
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="userId != null">user_id,</if>
+            <if test="itemId != null">item_id,</if>
+            <if test="score != null">score,</if>
+            <if test="batchNo != null">batch_no,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="userId != null">#{userId},</if>
+            <if test="itemId != null">#{itemId},</if>
+            <if test="score != null">#{score},</if>
+            <if test="batchNo != null">#{batchNo},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateKpiScore" parameterType="KpiScore">
+        update kpi_score
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="itemId != null">item_id = #{itemId},</if>
+            <if test="score != null">score = #{score},</if>
+            <if test="batchNo != null">batch_no = #{batchNo},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteKpiScoreById" parameterType="Long">
+        delete from kpi_score where id = #{id}
+    </delete>
+
+    <delete id="deleteKpiScoreByIds" parameterType="String">
+        delete from kpi_score where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
