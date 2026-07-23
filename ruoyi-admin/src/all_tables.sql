@@ -3,7 +3,7 @@
 -- 适用于：绩效考核、六必查、正负面清单、执勤表扬台账、问题通报、视频回放
 -- =====================================================
 
--- ========== 绩效考核模块 ==========
+-- ========== 考核模块 ==========
 CREATE TABLE IF NOT EXISTS kpi_item (
     id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
     name        varchar(100) NOT NULL COMMENT '考核项目名称',
@@ -34,31 +34,54 @@ CREATE TABLE IF NOT EXISTS kpi_score (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='考核分数表';
 
 -- ========== 六必查模块 ==========
-CREATE TABLE IF NOT EXISTS six_check_item (
+-- 六必查项目表（可增删改）
+CREATE TABLE six_check_item (
     id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
     name        varchar(100) NOT NULL COMMENT '检查项目名称',
     sort_order  int(4)       DEFAULT 0 COMMENT '排序号',
-    dept_id     bigint(20)   DEFAULT NULL COMMENT '所属部门ID',
     create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
     create_time datetime     COMMENT '创建时间',
     update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
     update_time datetime     COMMENT '更新时间',
     PRIMARY KEY (id)
-) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='六必查检查项目表';
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='六必查项目表';
 
-CREATE TABLE IF NOT EXISTS six_check_record (
+-- 初始化十条默认项目
+INSERT INTO six_check_item (name, sort_order) VALUES
+('履职状态、到岗到位和物品定制', 1),
+('劳动工具管理和外协人员管理', 2),
+('搜身', 3),
+('监管安全管理', 4),
+('清点人数', 5),
+('出收工队列和如厕管理', 6),
+('互监组管理', 7),
+('门禁门锁', 8),
+('安全生产', 9),
+('其他', 10);
+
+-- 六必查记录表（按月份存储）
+CREATE TABLE six_check_record (
     id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
     item_id     bigint(20)   NOT NULL COMMENT '检查项目ID',
-    record_value text        COMMENT '记录内容',
+    record_value text         COMMENT '记录内容',
     batch_no    varchar(7)   NOT NULL COMMENT '月份（YYYY-MM）',
-    dept_id     bigint(20)   DEFAULT NULL COMMENT '所属部门ID',
     create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
     create_time datetime     COMMENT '创建时间',
     update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
     update_time datetime     COMMENT '更新时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_item_month_dept (item_id, batch_no, dept_id)
+    UNIQUE KEY uk_item_month (item_id, batch_no)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='六必查记录表';
+
+-- ========== 部门隔离字段 ==========
+ALTER TABLE six_check_item ADD COLUMN IF NOT EXISTS dept_id bigint(20) DEFAULT NULL COMMENT '所属部门ID';
+ALTER TABLE six_check_record ADD COLUMN IF NOT EXISTS dept_id bigint(20) DEFAULT NULL COMMENT '所属部门ID';
+
+-- 删除旧唯一约束（如果存在）
+ALTER TABLE six_check_record DROP INDEX IF EXISTS uk_item_month;
+
+-- 创建新唯一约束（包含部门）
+ALTER TABLE six_check_record ADD UNIQUE KEY uk_item_month_dept (item_id, batch_no, dept_id);
 
 -- ========== 正负面清单模块 ==========
 CREATE TABLE IF NOT EXISTS positive_negative (
@@ -137,24 +160,24 @@ CREATE TABLE IF NOT EXISTS video_playback_record (
     UNIQUE KEY uk_item_month_dept (item_id, batch_no, dept_id)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='视频回放记录表';
 
--- ========== 六必查初始数据（已存在的不会重复插入）==========
-INSERT INTO six_check_item (dept_id, name, sort_order, create_by, create_time)
-SELECT d.dept_id, proj.name, proj.sort_order, 'admin', NOW()
-FROM sys_dept d
-CROSS JOIN (
-    SELECT '队伍管理规范' AS name, 1 AS sort_order
-    UNION ALL SELECT '监管制度落实', 2
-    UNION ALL SELECT '安全隐患排查', 3
-    UNION ALL SELECT '文明执法情况', 4
-    UNION ALL SELECT '教育改造质量', 5
-    UNION ALL SELECT '生活卫生管理', 6
-    UNION ALL SELECT '劳动生产安全', 7
-    UNION ALL SELECT '应急处置能力', 8
-    UNION ALL SELECT '信息化应用', 9
-    UNION ALL SELECT '廉政建设情况', 10
-) proj
-WHERE d.del_flag = '0'
-  AND NOT EXISTS (
-    SELECT 1 FROM six_check_item si
-    WHERE si.dept_id = d.dept_id AND si.name = proj.name
-);
+-- -- ========== 六必查初始数据（已存在的不会重复插入）==========
+-- INSERT INTO six_check_item (dept_id, name, sort_order, create_by, create_time)
+-- SELECT d.dept_id, proj.name, proj.sort_order, 'admin', NOW()
+-- FROM sys_dept d
+-- CROSS JOIN (
+--     SELECT '队伍管理规范' AS name, 1 AS sort_order
+--     UNION ALL SELECT '劳动工具管理和外协人员管理', 2
+--     UNION ALL SELECT '安全隐患排查', 3
+--     UNION ALL SELECT '文明执法情况', 4
+--     UNION ALL SELECT '教育改造质量', 5
+--     UNION ALL SELECT '生活卫生管理', 6
+--     UNION ALL SELECT '劳动生产安全', 7
+--     UNION ALL SELECT '应急处置能力', 8
+--     UNION ALL SELECT '信息化应用', 9
+--     UNION ALL SELECT '廉政建设情况', 10
+-- ) proj
+-- WHERE d.del_flag = '0'
+--   AND NOT EXISTS (
+--     SELECT 1 FROM six_check_item si
+--     WHERE si.dept_id = d.dept_id AND si.name = proj.name
+-- );

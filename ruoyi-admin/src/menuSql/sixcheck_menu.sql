@@ -20,6 +20,8 @@ SELECT '六必查编辑', menu_id, 1, 'F', '0', '', 'sixcheck:record:edit', '#',
 FROM sys_menu
 WHERE menu_name = '六必查录入' AND menu_type = 'C';
 
+
+
 -- 授权给超级管理员（含按钮）
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT 1, menu_id FROM sys_menu 

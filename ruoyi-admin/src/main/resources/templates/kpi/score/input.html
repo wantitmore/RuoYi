@@ -146,13 +146,8 @@
                                 <div class="col-sm-2">
                                     <select id="categorySelect" class="form-control">
                                         <option value="">全部类别</option>
-                                        <option value="纪律作风">纪律作风</option>
-                                        <option value="狱政">狱政</option>
-                                        <option value="生产">生产</option>
-                                        <option value="教育">教育</option>
-                                        <option value="执勤现场管理">执勤现场管理</option>
-                                        <option value="正负面清单">正负面清单</option>
-                                        <option value="动态档案评价">动态档案评价</option>
+                                        <option th:each="dict : ${@dict.getType('kpi_category')}"
+                                            th:value="${dict.dictValue}" th:text="${dict.dictLabel}"></option>
                                     </select>
                                 </div>
                                 <div class="col-sm-2">

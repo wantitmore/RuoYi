@@ -56,20 +56,8 @@
                 <div class="col-sm-8">
                     <select name="category" class="form-control" required>
                         <option value="">请选择类别</option>
-                        <option value="狱政" th:attr="selected=${kpiItem.category == '狱政'} ? 'selected' : null">狱政
-                        </option>
-                        <option value="纪律作风" th:attr="selected=${kpiItem.category == '纪律作风'} ? 'selected' : null">纪律作风
-                        </option>
-                        <option value="生产" th:attr="selected=${kpiItem.category == '生产'} ? 'selected' : null">生产
-                        </option>
-                        <option value="教育" th:attr="selected=${kpiItem.category == '教育'} ? 'selected' : null">教育
-                        </option>
-                        <option value="执勤现场管理" th:attr="selected=${kpiItem.category == '执勤现场管理'} ? 'selected' : null">执勤现场管理
-                        </option>
-                        <option value="正负面清单" th:attr="selected=${kpiItem.category == '正负面清单'} ? 'selected' : null">正负面清单
-                        </option>
-                        <option value="动态档案评价" th:attr="selected=${kpiItem.category == '动态档案评价'} ? 'selected' : null">动态档案评价
-                        </option>
+                        <option th:each="dict : ${@dict.getType('kpi_category')}" th:value="${dict.dictValue}"
+                            th:text="${dict.dictLabel}" th:selected="${kpiItem.category == dict.dictValue}"></option>
                     </select>
                 </div>
             </div>

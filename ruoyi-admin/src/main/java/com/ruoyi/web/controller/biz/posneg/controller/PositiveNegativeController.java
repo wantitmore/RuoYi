@@ -65,6 +65,9 @@ public class PositiveNegativeController extends BaseController {
     @ResponseBody
     public TableDataInfo list(PositiveNegative positiveNegative) {
         startPage();
+        if (!ShiroUtils.getSysUser().isAdmin()) {
+            positiveNegative.setDeptId(ShiroUtils.getSysUser().getDeptId());
+        }
         List<PositiveNegative> list = positiveNegativeService.selectPositiveNegativeList(positiveNegative);
         // 填充用户姓名
         for (PositiveNegative p : list) {
@@ -112,6 +115,8 @@ public class PositiveNegativeController extends BaseController {
         query.setUserId(positiveNegative.getUserId());
         query.setCategory(positiveNegative.getCategory());
         query.setBatchNo(positiveNegative.getBatchNo());
+        query.setDeptId(ShiroUtils.getSysUser().getDeptId());
+        //positiveNegative.setDeptId(ShiroUtils.getSysUser().getDeptId());
         List<PositiveNegative> existList = positiveNegativeService.selectPositiveNegativeList(query);
 
         if (existList.size() > 0) {
@@ -121,10 +126,12 @@ public class PositiveNegativeController extends BaseController {
             exist.setSuggestion(positiveNegative.getSuggestion());
             exist.setCount(positiveNegative.getCount());
             exist.setUpdateBy(ShiroUtils.getLoginName());
+            exist.setDeptId(ShiroUtils.getSysUser().getDeptId());
             return toAjax(positiveNegativeService.updatePositiveNegative(exist));
         } else {
             // 不存在，则新增
             positiveNegative.setCreateBy(ShiroUtils.getLoginName());
+            positiveNegative.setDeptId(ShiroUtils.getSysUser().getDeptId());
             return toAjax(positiveNegativeService.insertPositiveNegative(positiveNegative));
         }
     }
@@ -156,6 +163,7 @@ public class PositiveNegativeController extends BaseController {
     @PostMapping("/edit")
     @ResponseBody
     public AjaxResult editSave(PositiveNegative positiveNegative) {
+        positiveNegative.setDeptId(ShiroUtils.getSysUser().getDeptId());
         return toAjax(positiveNegativeService.updatePositiveNegative(positiveNegative));
     }
 

@@ -43,8 +43,18 @@ public class PositiveNegative extends BaseEntity {
     @Excel(name = "月份", readConverterExp = "Y=YYY-MM")
     private String batchNo;
 
-    @Excel(name = "人员姓名")
+    
     private String userName;
+
+    private Long deptId;
+
+    public Long getDeptId() {
+        return deptId;
+    }
+
+    public void setDeptId(Long deptId) {
+        this.deptId = deptId;
+    }
 
     public String getUserName() {
         return userName;
@@ -110,8 +120,6 @@ public class PositiveNegative extends BaseEntity {
         return batchNo;
     }
 
-    
-
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
@@ -127,6 +135,7 @@ public class PositiveNegative extends BaseEntity {
                 .append("updateBy", getUpdateBy())
                 .append("updateTime", getUpdateTime())
                 .append("userName", getUserName())
+                .append("deptId", getDeptId())
                 .toString();
     }
 }

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('一键复制默认项目')" />
+</head>
+<body class="gray-bg">
+<div class="wrapper wrapper-content animated fadeInRight">
+    <div class="row">
+        <div class="col-sm-12">
+            <div class="ibox float-e-margins">
+                <div class="ibox-title"><h5>一键复制默认项目</h5></div>
+                <div class="ibox-content">
+                    <div class="form-horizontal">
+                        <div class="form-group">
+                            <label class="col-sm-3 control-label">选择目标部门：</label>
+                            <div class="col-sm-6">
+                                <select id="targetDept" class="form-control">
+                                    <option value="">请选择部门</option>
+                                    <option th:each="dept : ${depts}" th:value="${dept.deptId}" th:text="${dept.deptName}"></option>
+                                </select>
+                            </div>
+                            <div class="col-sm-3">
+                                <button class="btn btn-primary" onclick="copyData()">
+                                    <i class="fa fa-copy"></i> 一键复制
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="col-sm-offset-3 col-sm-8">
+                                <span class="help-block">将量化考核、六必查、视频回放的默认项目复制到所选部门。已存在的项目不会重复。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div th:include="include :: footer"></div>
+<script th:inline="javascript">
+    var ctx = [[@{/}]];
+
+    function copyData() {
+        var deptId = $("#targetDept").val();
+        if (!deptId) {
+            alert("请选择目标部门");
+            return;
+        }
+        if (!confirm("确定要将所有默认项目复制到该部门吗？")) {
+            return;
+        }
+        $.ajax({
+            url: ctx + "system/defaultcopy/copyAll",
+            type: "POST",
+            data: { deptId: deptId },
+            success: function(res) {
+                if (res.code == 0) {
+                    alert(res.msg);
+                } else {
+                    alert("复制失败：" + res.msg);
+                }
+            },
+            error: function() {
+                alert("请求失败，请检查网络或权限");
+            }
+        });
+    }
+</script>
+</body>
+</html>

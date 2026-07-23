@@ -1,3 +1,30 @@
+-- 一键复制
+-- 1. 查出“系统管理”的菜单ID，并存入变量
+SET @parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '系统管理' AND menu_type = 'M');
+
+-- 2. 插入“一键复制默认项目”子菜单（使用上一步的变量）
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark)
+VALUES ('一键复制默认项目', @parent_id, 99, 'C', '0', 'system/defaultcopy', 'system:defaultcopy:view', '#', 'admin', NOW(), '', NULL, '');
+
+-- 3. 给超级管理员授权
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id FROM sys_menu WHERE menu_name = '一键复制默认项目'
+AND NOT EXISTS (
+    SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 1 AND rm.menu_id = sys_menu.menu_id
+);
+
+
+--正负面清单部门隔离
+
+-- 清空旧数据
+TRUNCATE TABLE positive_negative;
+
+-- 添加部门字段
+ALTER TABLE positive_negative ADD COLUMN dept_id bigint(20) DEFAULT NULL COMMENT '所属部门ID';
+
+
+
+--量化考核
 -- 1. 清空已有数据
 TRUNCATE TABLE kpi_score;
 TRUNCATE TABLE kpi_item;
@@ -55,3 +82,24 @@ CROSS JOIN (
     UNION ALL SELECT '其他未按要求落实一岗一责处置工作', 20, 'NUMBER', '一岗一责处置', '视情节予以扣1-3分'
     UNION ALL SELECT '存在上述条款未列明，未落实“两个职责”相关工作情形', 20, 'NUMBER', '其他履职事项', '视情节予以扣1-5分'
 ) proj;
+
+--考核类别
+INSERT INTO sys_dict_type (dict_name, dict_type, status, create_by, create_time, update_by, update_time, remark)
+SELECT '考核类别', 'kpi_category', '0', 'admin', NOW(), '', NULL, '考核类别列表'
+WHERE NOT EXISTS (SELECT 1 FROM sys_dict_type WHERE dict_type = 'kpi_category');
+
+DELETE FROM sys_dict_data WHERE dict_type = 'kpi_category';
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, update_by, update_time, remark)
+VALUES
+(1, '一犯一档分析', '一犯一档分析', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(2, '一情一报联动', '一情一报联动', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(3, '一时一控维稳', '一时一控维稳', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(4, '一诉一化疏导', '一诉一化疏导', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(5, '一危一策攻坚', '一危一策攻坚', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
+(6, '一定一查劳动', '一定一查劳动', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(7, '一案一审评查', '一案一审评查', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(8, '一释一评预警', '一释一评预警', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(9, '一班一表管控', '一班一表管控', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
+(10, '一岗一责处置', '一岗一责处置', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
+(11, '其他履职事项', '其他履职事项', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
