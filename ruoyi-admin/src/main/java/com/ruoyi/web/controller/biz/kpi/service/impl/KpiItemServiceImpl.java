@@ -1,6 +1,9 @@
 package com.ruoyi.web.controller.biz.kpi.service.impl;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+
 import com.ruoyi.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,8 +19,7 @@ import com.ruoyi.common.core.text.Convert;
  * @date 2026-05-31
  */
 @Service
-public class KpiItemServiceImpl implements IKpiItemService 
-{
+public class KpiItemServiceImpl implements IKpiItemService {
     @Autowired
     private KpiItemMapper kpiItemMapper;
 
@@ -28,11 +30,9 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 考核项目
      */
     @Override
-    public KpiItem selectKpiItemById(Long id)
-    {
+    public KpiItem selectKpiItemById(Long id) {
         return kpiItemMapper.selectKpiItemById(id);
     }
-    
 
     /**
      * 查询考核项目列表
@@ -41,8 +41,7 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 考核项目
      */
     @Override
-    public List<KpiItem> selectKpiItemList(KpiItem kpiItem)
-    {
+    public List<KpiItem> selectKpiItemList(KpiItem kpiItem) {
         return kpiItemMapper.selectKpiItemList(kpiItem);
     }
 
@@ -53,8 +52,7 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 结果
      */
     @Override
-    public int insertKpiItem(KpiItem kpiItem)
-    {
+    public int insertKpiItem(KpiItem kpiItem) {
         kpiItem.setCreateTime(DateUtils.getNowDate());
         return kpiItemMapper.insertKpiItem(kpiItem);
     }
@@ -66,8 +64,7 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 结果
      */
     @Override
-    public int updateKpiItem(KpiItem kpiItem)
-    {
+    public int updateKpiItem(KpiItem kpiItem) {
         kpiItem.setUpdateTime(DateUtils.getNowDate());
         return kpiItemMapper.updateKpiItem(kpiItem);
     }
@@ -79,8 +76,7 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 结果
      */
     @Override
-    public int deleteKpiItemByIds(String ids)
-    {
+    public int deleteKpiItemByIds(String ids) {
         return kpiItemMapper.deleteKpiItemByIds(Convert.toStrArray(ids));
     }
 
@@ -91,8 +87,20 @@ public class KpiItemServiceImpl implements IKpiItemService
      * @return 结果
      */
     @Override
-    public int deleteKpiItemById(Long id)
-    {
+    public int deleteKpiItemById(Long id) {
         return kpiItemMapper.deleteKpiItemById(id);
+    }
+
+    @Override
+    public Map<String, String> selectCategoryRequirementMap() {
+        List<KpiItem> allItems = kpiItemMapper.selectKpiItemList(new KpiItem());
+        Map<String, String> map = new LinkedHashMap<>();
+        for (KpiItem item : allItems) {
+            if (item.getCategory() != null && !map.containsKey(item.getCategory())) {
+                map.put(item.getCategory(),
+                        item.getWorkRequirement() != null ? item.getWorkRequirement() : "");
+            }
+        }
+        return map;
     }
 }

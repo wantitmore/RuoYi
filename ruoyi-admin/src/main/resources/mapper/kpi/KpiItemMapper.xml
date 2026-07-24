@@ -16,10 +16,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"    column="update_time"    />
         <result property="deptId"    column="dept_id"    />
         <result property="category" column="category"/>
+        <result property="workRequirement" column="work_requirement"/>
     </resultMap>
 
     <sql id="selectKpiItemVo">
-        select id, name, max_score, score_type, remark, create_by, create_time, update_by, update_time, dept_id,category from kpi_item
+        select id, name, max_score, score_type, remark, work_requirement, create_by, create_time, update_by, update_time, dept_id,category from kpi_item
     </sql>
 
     <select id="selectKpiItemList" parameterType="KpiItem" resultMap="KpiItemResult">

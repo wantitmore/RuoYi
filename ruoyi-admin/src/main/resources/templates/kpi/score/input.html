@@ -146,8 +146,12 @@
                                 <div class="col-sm-2">
                                     <select id="categorySelect" class="form-control">
                                         <option value="">全部类别</option>
-                                        <option th:each="dict : ${@dict.getType('kpi_category')}"
-                                            th:value="${dict.dictValue}" th:text="${dict.dictLabel}"></option>
+                                        <option 
+                                            th:each="dict : ${@dict.getType('kpi_category')}"
+                                            th:value="${dict.dictValue}" 
+                                            th:text="${dict.dictLabel}"
+                                             th:title="${categoryReqMap != null ? categoryReqMap.getOrDefault(dict.dictValue, '') : ''}">
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="col-sm-2">

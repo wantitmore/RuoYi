@@ -103,3 +103,17 @@ VALUES
 (9, '一班一表管控', '一班一表管控', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL),
 (10, '一岗一责处置', '一岗一责处置', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
 (11, '其他履职事项', '其他履职事项', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
+
+--添加工作内容字段
+ALTER TABLE kpi_item ADD COLUMN work_requirement varchar(200) DEFAULT NULL COMMENT '工作内容要求';
+UPDATE kpi_item SET work_requirement = '专管警察对专管罪犯逐一建立动态档案，掌握专管罪犯“四知道”，做到“无册点名”；掌握认罪服判以及入监后的改造情况，及时做好心理动态分析和危险性评估，采取相应教育改造措施，及时更新档案数据，真实记录专管罪犯从入监到出监的改造全过程。' WHERE category = '一犯一档分析';
+UPDATE kpi_item SET work_requirement = '严格执行《狱情排查处置办法》，专管警察落实狱情排查并按要求录入狱情。按需物建耳目信息员，及时发现化解异常情况。落实清仓搜身，排查私藏“两违一危”物品。对异常罪犯落实互监包夹盯防、即时报告、及时处置，记录存档，实现问题闭环管理。' WHERE category = '一情一报联动';
+UPDATE kpi_item SET work_requirement = '定期对专管罪犯开展集中讲评、个别谈话教育。春节、中秋、国庆等敏感时段开展思想动态监测，及时化解不稳定因素，保障重要节点监管安全。' WHERE category = '一时一控维稳';
+UPDATE kpi_item SET work_requirement = '专管警察排查、收集罪犯矛盾诉求并及时处置。对突出矛盾诉求开展个案分析，运用个别谈话、心理干预化解矛盾。对涉访涉诉、存在仇视言行、诉求突出罪犯及时教育转化、上报跟进。' WHERE category = '一诉一化疏导';
+UPDATE kpi_item SET work_requirement = '按照《广东省监狱管理局重点罪犯管理教育办法》建立专项档案，落实谈话教育、清仓搜身；每月分析危险倾向变化，动态调整风险防控和教育转化措施，定期记录报告改造进展。' WHERE category = '一危一策攻坚';
+UPDATE kpi_item SET work_requirement = '跟进专管罪犯岗位技能培训、劳动岗位安排、劳动类级确定和变更、劳动定额完成、劳动计分考核、安全生产措施落实；掌握劳动改造效果，及时处置异常情况，按期评估劳动改造质效。' WHERE category = '一定一查劳动';
+UPDATE kpi_item SET work_requirement = '每月审查提请专管罪犯计分考核；按照“减假暂”案件办理要求落实实质化审理。对考核不满、“减假暂”未达预期罪犯及时开展教育转化、上报跟进。' WHERE category = '一案一审评查';
+UPDATE kpi_item SET work_requirement = '掌握专管罪犯刑满释放前思想动态，及时开展出监前专项教育，做好出监评估，出具再犯危险性评估意见；发现异常立即预警上报处置。' WHERE category = '一释一评预警';
+UPDATE kpi_item SET work_requirement = '监区、分监区值班领导对现场安全负第一责任，开展现场检查、警力调配，处置交接异常情况；管教员承担现场安全直接责任，排查、处置、上报、交接罪犯风险、矛盾诉求与异常情况。' WHERE category = '一班一表管控';
+UPDATE kpi_item SET work_requirement = '全面落实监区警察“两个职责”各项工作要求' WHERE category = '一岗一责处置';
+UPDATE kpi_item SET work_requirement = '各岗位出现本标准未规定的不规范情形，依照上级法规制度处理。本标准由广东省河源监狱考核办负责解释，自下发之日起施行。' WHERE category = '其他履职事项';

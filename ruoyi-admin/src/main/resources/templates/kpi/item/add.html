@@ -21,8 +21,12 @@
                 <div class="col-sm-8">
                     <select name="category" class="form-control" required>
                         <option value="">请选择类别</option>
-                        <option th:each="dict : ${@dict.getType('kpi_category')}" th:value="${dict.dictValue}"
-                            th:text="${dict.dictLabel}"></option>
+                        <option 
+                            th:each="dict : ${@dict.getType('kpi_category')}" 
+                            th:value="${dict.dictValue}"
+                            th:text="${dict.dictLabel}"
+                            th:title="${categoryReqMap != null ? categoryReqMap.getOrDefault(dict.dictValue, '') : ''}">
+                        </option>
                     </select>
                 </div>
             </div>

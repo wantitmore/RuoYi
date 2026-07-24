@@ -34,6 +34,17 @@ public class KpiItem extends BaseEntity
     /** 所属部门ID（关联sys_dept） */
     private Long deptId;
 
+    @Excel(name = "工作内容要求")
+    private String workRequirement;
+
+    public String getWorkRequirement() {
+        return workRequirement;
+    }
+
+    public void setWorkRequirement(String workRequirement) {
+        this.workRequirement = workRequirement;
+    }
+
     private String category; // 考核类别（纪律作风/狱政/生产/教育/执勤现场管理/正负面清单/动态档案评价）
 
     public void setId(Long id) 
@@ -110,6 +121,7 @@ public class KpiItem extends BaseEntity
             .append("updateTime", getUpdateTime())
             .append("deptId", getDeptId())
             .append("category", getCategory())
+            .append("workRequirement", getWorkRequirement())
             .toString();
     }
 }

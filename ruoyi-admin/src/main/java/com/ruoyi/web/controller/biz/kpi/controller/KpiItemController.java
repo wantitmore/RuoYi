@@ -44,7 +44,8 @@ public class KpiItemController extends BaseController {
     // ---------- 页面跳转 ----------
     @RequiresPermissions("kpi:item:view")
     @GetMapping()
-    public String item() {
+    public String item(ModelMap mmap) {
+        mmap.put("categoryReqMap", kpiItemService.selectCategoryRequirementMap());
         return prefix + "/item";
     }
 
@@ -75,6 +76,7 @@ public class KpiItemController extends BaseController {
     // ---------- 新增页面 ----------
     @GetMapping("/add")
     public String add(ModelMap mmap) {
+        mmap.put("categoryReqMap", kpiItemService.selectCategoryRequirementMap());
         if (!ShiroUtils.getSysUser().isAdmin()) {
             SysDept dept = ShiroUtils.getSysUser().getDept();
             mmap.put("deptId", dept.getDeptId());
@@ -109,6 +111,7 @@ public class KpiItemController extends BaseController {
         return "error/404";
     }
         mmap.put("kpiItem", item);
+        mmap.put("categoryReqMap", kpiItemService.selectCategoryRequirementMap());
         if (!ShiroUtils.getSysUser().isAdmin()) {
             SysDept dept = ShiroUtils.getSysUser().getDept();
             if (!dept.getDeptId().equals(item.getDeptId())) {

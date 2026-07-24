@@ -172,6 +172,7 @@ public class KpiScoreController extends BaseController {
         // 部门列表仍然需要
         List<SysDept> depts = deptService.selectDeptList(new SysDept());
         mmap.put("depts", depts);
+        mmap.put("categoryReqMap", kpiItemService.selectCategoryRequirementMap());
         return "kpi/score/input";
     }
 
