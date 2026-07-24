@@ -117,3 +117,58 @@ UPDATE kpi_item SET work_requirement = '掌握专管罪犯刑满释放前思想�
 UPDATE kpi_item SET work_requirement = '监区、分监区值班领导对现场安全负第一责任，开展现场检查、警力调配，处置交接异常情况；管教员承担现场安全直接责任，排查、处置、上报、交接罪犯风险、矛盾诉求与异常情况。' WHERE category = '一班一表管控';
 UPDATE kpi_item SET work_requirement = '全面落实监区警察“两个职责”各项工作要求' WHERE category = '一岗一责处置';
 UPDATE kpi_item SET work_requirement = '各岗位出现本标准未规定的不规范情形，依照上级法规制度处理。本标准由广东省河源监狱考核办负责解释，自下发之日起施行。' WHERE category = '其他履职事项';
+
+
+-- 1.开会台账主表
+CREATE TABLE meeting_log (
+    id               bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    meeting_date     date         NOT NULL COMMENT '开会日期',
+    meeting_content  text         COMMENT '开会情况',
+    dept_id          bigint(20)   DEFAULT NULL COMMENT '所属部门ID',
+    create_by        varchar(64)  DEFAULT '' COMMENT '创建者',
+    create_time      datetime     COMMENT '创建时间',
+    update_by        varchar(64)  DEFAULT '' COMMENT '更新者',
+    update_time      datetime     COMMENT '更新时间',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='开会台账主表';
+
+-- 2.参会人员关联表
+CREATE TABLE meeting_participant (
+    id           bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    meeting_id   bigint(20) NOT NULL COMMENT '会议ID',
+    user_id      bigint(20) NOT NULL COMMENT '用户ID',
+    PRIMARY KEY (id),
+    KEY idx_meeting_id (meeting_id)
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='会议参会人员关联表';
+
+--3.菜单sql
+-- 清理旧数据
+DELETE rm FROM sys_role_menu rm
+JOIN sys_menu m ON rm.menu_id = m.menu_id
+WHERE m.menu_name LIKE '%开会台账%';
+
+DELETE FROM sys_menu WHERE menu_name LIKE '%开会台账%';
+
+-- 获取父菜单ID
+SET @parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '执勤表扬台账' AND menu_type = 'M');
+
+-- 插入子菜单
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark)
+VALUES ('开会台账管理', @parent_id, 2, 'C', '0', 'meeting/log', 'meeting:view', '#', 'admin', NOW(), '', NULL, '开会台账列表');
+SET @menu_id = LAST_INSERT_ID();
+
+-- 按钮权限
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark) VALUES
+('开会台账查询', @menu_id, 1, 'F', '0', '', 'meeting:list', '#', 'admin', NOW(), '', NULL, ''),
+('开会台账新增', @menu_id, 2, 'F', '0', '', 'meeting:add', '#', 'admin', NOW(), '', NULL, ''),
+('开会台账修改', @menu_id, 3, 'F', '0', '', 'meeting:edit', '#', 'admin', NOW(), '', NULL, ''),
+('开会台账删除', @menu_id, 4, 'F', '0', '', 'meeting:remove', '#', 'admin', NOW(), '', NULL, '');
+
+-- 授权给超级管理员
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id FROM sys_menu 
+WHERE menu_name LIKE '%开会台账%'
+AND NOT EXISTS (
+    SELECT 1 FROM sys_role_menu rm
+    WHERE rm.role_id = 1 AND rm.menu_id = sys_menu.menu_id
+);
