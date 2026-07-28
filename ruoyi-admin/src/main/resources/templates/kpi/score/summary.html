@@ -50,6 +50,7 @@
                                         <th>被考核人</th>
                                         <th>部门</th>
                                         <th>总分</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="summaryBody"></tbody>
@@ -78,7 +79,39 @@
                 $("#deptSelect").prev("label").hide();
                 $("#deptSelect").after('<span class="form-control-static" style="margin-left:10px;font-weight:bold;padding-top:7px;display:inline-block;">' + currentDeptName + '</span>');
             }
+            // 页面打开时自动加载
+            search();
+            // 仅岗位下拉框改变时自动刷新
+            $("#batchNo,#deptSelect,#postSelect").on('change', function () {
+                search();
+            });
         });
+
+        function showDetail(userId, userName) {
+            var batchNo = $("#batchNo").val();
+            if (!batchNo) { alert("请先选择月份"); return; }
+
+            $.get(ctx + "kpi/score/personDetail", { batchNo: batchNo, userId: userId }, function (res) {
+                if (res.code != 0) { alert("加载详情失败"); return; }
+                var details = res.data; 
+                var content = '<table class="table table-bordered table-striped">';
+                content += '<thead><tr><th>考核项目</th><th>得分</th><th>备注</th></tr></thead><tbody>';
+                for (var i = 0; i < details.length; i++) {
+                    var d = details[i];
+                    content += '<tr><td>' + d.itemName + '</td><td>' + d.score + '</td><td>' + (d.remark || '') + '</td></tr>';
+                }
+                content += '</tbody></table>';
+
+                // 弹窗展示
+                layer.open({
+                    type: 1,
+                    title: userName + ' - 考核详情',
+                    shadeClose: true,
+                    area: ['700px', '400px'],
+                    content: '<div style="padding:15px;">' + content + '</div>'
+                });
+            });
+        }
 
         function search() {
             var batchNoEl = document.getElementById("batchNo");
@@ -129,6 +162,8 @@
                         html += '<td>' + row.userName + '</td>';
                         html += '<td>' + row.deptName + '</td>';
                         html += '<td>' + row.totalScore + '</td>';
+                        // 新增“详细”按钮列
+                        html += '<td><button class="btn btn-xs btn-info" onclick="showDetail(\'' + row.userId + '\', \'' + row.userName + '\')">详细</button></td>';
                         html += '</tr>';
                     }
                     document.getElementById("summaryBody").innerHTML = html;

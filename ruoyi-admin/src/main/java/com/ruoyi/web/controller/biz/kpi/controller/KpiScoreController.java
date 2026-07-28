@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.kpi.controller;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -58,7 +59,7 @@ public class KpiScoreController extends BaseController {
 
     @Autowired
     private ISysUserService userService; // 若依系统用户服务
-    
+
     @Autowired
     private ISysPostService postService;
 
@@ -272,7 +273,6 @@ public class KpiScoreController extends BaseController {
         return success().put("data", result);
     }
 
-
     // 返回页面的方法（访问地址：/kpi/score/summary）
     @RequiresPermissions("kpi:score:summary")
     @GetMapping("/summary")
@@ -306,5 +306,27 @@ public class KpiScoreController extends BaseController {
         }
         List<ScoreSummary> list = kpiScoreService.selectSummary(batchNo, deptId, postId);
         return success().put("data", list);
+    }
+
+    @GetMapping("/personDetail")
+    @ResponseBody
+    public AjaxResult personDetail(@RequestParam String batchNo, @RequestParam Long userId) {
+        // 查询该用户、该批次的所有打分记录
+        KpiScore query = new KpiScore();
+        query.setBatchNo(batchNo);
+        query.setUserId(userId);
+        List<KpiScore> list = kpiScoreService.selectKpiScoreList(query);
+
+        // 组装详情数据：需要考核项目名称
+        List<Map<String, Object>> details = new ArrayList<>();
+        for (KpiScore score : list) {
+            Map<String, Object> item = new HashMap<>();
+            KpiItem kpiItem = kpiItemService.selectKpiItemById(score.getItemId());
+            item.put("itemName", kpiItem != null ? kpiItem.getName() : "未知项目");
+            item.put("score", score.getScore());
+            item.put("remark", score.getRemark() != null ? score.getRemark() : "");
+            details.add(item);
+        }
+        return success().put("data", details);
     }
 }

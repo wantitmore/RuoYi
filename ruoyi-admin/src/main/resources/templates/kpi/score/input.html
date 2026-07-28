@@ -146,11 +146,9 @@
                                 <div class="col-sm-2">
                                     <select id="categorySelect" class="form-control">
                                         <option value="">全部类别</option>
-                                        <option 
-                                            th:each="dict : ${@dict.getType('kpi_category')}"
-                                            th:value="${dict.dictValue}" 
-                                            th:text="${dict.dictLabel}"
-                                             th:title="${categoryReqMap != null ? categoryReqMap.getOrDefault(dict.dictValue, '') : ''}">
+                                        <option th:each="dict : ${@dict.getType('kpi_category')}"
+                                            th:value="${dict.dictValue}" th:text="${dict.dictLabel}"
+                                            th:title="${categoryReqMap != null ? categoryReqMap.getOrDefault(dict.dictValue, '') : ''}">
                                         </option>
                                     </select>
                                 </div>
@@ -204,6 +202,16 @@
         if (currentDeptId && currentDeptId !== 'null') {
             $("#deptSelect").val(currentDeptId);
         }
+        // 页面打开时自动加载（如果部门和月份都有值）
+        if ($("#deptSelect").val() && $("#batchNo").val()) {
+            loadTable();
+        }
+        // 仅类别下拉框改变时自动刷新
+        $("#batchNo,#categorySelect").on('change', function () {
+            if ($("#deptSelect").val() && $("#batchNo").val()) {
+                loadTable();
+            }
+        });
         });
 
         function loadTable() {
@@ -281,7 +289,7 @@
                             '<div style="display:flex; align-items:center; gap:4px;">' +
                             '<input type="number" class="form-control score-input" ' +
                             'data-item-id="' + items[j].id + '" ' +
-                            'max="' + items[j].maxScore + '" min="0" step="0.5" ' +
+                            'max="' + items[j].maxScore + '" min="-10" step="0.5" ' +
                             'placeholder="0-' + items[j].maxScore + '" ' +
                             'value="' + existingScore + '" ' +
                             readonlyAttr + ' style="flex:1;">' +

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('六必查月汇总')" />
+</head>
+<body class="gray-bg">
+<div class="wrapper wrapper-content animated fadeInRight">
+    <div class="row">
+        <div class="col-sm-12">
+            <div class="ibox">
+                <div class="ibox-title"><h5>值班领导六必查月汇总</h5></div>
+                <div class="ibox-content">
+                    <div class="form-horizontal">
+                        <div class="form-group">
+                            <label class="col-sm-1 control-label">月份：</label>
+                            <div class="col-sm-2">
+                                <input type="month" id="month" class="form-control" />
+                            </div>
+                            <div class="col-sm-2">
+                                <button class="btn btn-primary" onclick="search()">
+                                    <i class="fa fa-search"></i> 查询
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <table id="summaryTable" class="table table-bordered table-hover" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%;">检查项目</th>
+                                <th>异常记录</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div th:include="include :: footer"></div>
+<script th:inline="javascript">
+    var ctx = [[@{/}]];
+
+    $(function() {
+        var now = new Date();
+        var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+        $("#month").val(month);
+        search();
+    });
+
+    function search() {
+        var month = $("#month").val();
+        if (!month) { alert("请选择月份"); return; }
+        $.get(ctx + "sixcheck/record/summary/data", { month: month }, function(res) {
+            if (res.code != 0) { alert("查询失败"); return; }
+            var data = res.data;
+            var html = '';
+            if (data.length === 0) {
+                html = '<tr><td colspan="2" class="text-center" style="color:#999;">当月无异常记录</td></tr>';
+            } else {
+                for (var i = 0; i < data.length; i++) {
+                    var item = data[i];
+                    html += '<tr>';
+                    html += '<td>' + item.itemName + '</td>';
+                    var details = item.details;
+                    var contentHtml = '';
+                    for (var j = 0; j < details.length; j++) {
+                        var d = details[j];
+                        var recordStr = d.content + '，值班领导：' + d.leader + '，' + d.date + '，' + d.shift;
+                        contentHtml += '<div style="margin-bottom:4px;padding-bottom:4px;border-bottom:1px dashed #eee;">' + recordStr + '</div>';
+                    }
+                    html += '<td>' + contentHtml + '</td>';
+                    html += '</tr>';
+                }
+            }
+            $("#summaryBody").html(html);
+            $("#summaryTable").show();
+        });
+    }
+</script>
+</body>
+</html>

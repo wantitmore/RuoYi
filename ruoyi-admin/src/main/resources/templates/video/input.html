@@ -32,8 +32,8 @@
                                 <thead>
                                     <tr>
                                         <th style="width: 60px;">序号</th>
-                                        <th>倒查位置</th>
-                                        <th>具体内容</th>
+                                        <th style="width: 15%;">倒查位置</th>
+                                        <th style="width: 20%;">具体内容</th>
                                         <th>回放情况</th>
                                     </tr>
                                 </thead>
@@ -59,6 +59,10 @@
             var now = new Date();
             var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
             $("#batchNo").val(month);
+            loadData();
+            $("#batchNo").on('change', function () {
+                loadData();
+            });
         });
 
         function loadData() {

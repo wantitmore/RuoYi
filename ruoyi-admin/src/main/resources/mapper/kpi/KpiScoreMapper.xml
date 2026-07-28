@@ -19,6 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSummary" resultType="com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary">
         SELECT 
+            u.user_id AS userId,
             u.user_name AS userName,
             d.dept_name AS deptName,
             p.post_name AS postName,

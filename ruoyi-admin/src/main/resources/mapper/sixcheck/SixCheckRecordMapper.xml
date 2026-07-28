@@ -13,20 +13,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"    column="update_time"    />
+        <result property="dutyLeader" column="duty_leader"/>
+        <result property="checkDate" column="check_date"/>
+        <result property="shift" column="shift"/>
     </resultMap>
 
     <sql id="selectSixCheckRecordVo">
-        select id, item_id, record_value, batch_no, create_by, create_time, update_by, update_time from six_check_record
+        select id, item_id, record_value, batch_no, dept_id, create_by, create_time, check_date, shift, duty_leader,update_by, update_time from six_check_record
     </sql>
 
     <select id="selectSixCheckRecordList" parameterType="SixCheckRecord" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
-        <where>  
-            <if test="itemId != null "> and item_id = #{itemId}</if>
-            <if test="recordValue != null  and recordValue != ''"> and record_value = #{recordValue}</if>
-            <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
+        <trim prefix="WHERE" prefixOverrides="AND |OR ">
+            <if test="itemId != null">AND item_id = #{itemId}</if>
+            <if test="recordValue != null and recordValue != ''">AND record_value = #{recordValue}</if>
+            <if test="batchNo != null and batchNo != ''">AND batch_no = #{batchNo}</if>
             <if test="deptId != null">AND dept_id = #{deptId}</if>
-        </where>
+            <if test="checkDate != null">AND check_date = #{checkDate, jdbcType=DATE}</if>
+            <if test="shift != null and shift != ''">AND shift = #{shift}</if>
+            <if test="dutyLeader != null and dutyLeader != ''">AND duty_leader = #{dutyLeader}</if>
+        </trim>
     </select>
     
     <select id="selectSixCheckRecordById" parameterType="Long" resultMap="SixCheckRecordResult">
@@ -34,28 +40,36 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <select id="selectListByMonth" resultMap="SixCheckRecordResult">
+        SELECT * FROM six_check_record
+        WHERE DATE_FORMAT(check_date, '%Y-%m') = #{month}
+        <if test="deptId != null">AND dept_id = #{deptId}</if>
+    </select>
+
     <insert id="insertSixCheckRecord" parameterType="SixCheckRecord" useGeneratedKeys="true" keyProperty="id">
         insert into six_check_record
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="itemId != null">item_id,</if>
             <if test="recordValue != null">record_value,</if>
-            <if test="batchNo != null and batchNo != ''">batch_no,</if>
+            <if test="batchNo != null">batch_no,</if>
+            <if test="deptId != null">dept_id,</if>
+            <if test="checkDate != null">check_date,</if>
+            <if test="shift != null">shift,</if>
+            <if test="dutyLeader != null">duty_leader,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
-            <if test="deptId != null">dept_id,</if>
-         </trim>
+        </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="itemId != null">#{itemId},</if>
             <if test="recordValue != null">#{recordValue},</if>
-            <if test="batchNo != null and batchNo != ''">#{batchNo},</if>
+            <if test="batchNo != null">#{batchNo},</if>
+            <if test="deptId != null">#{deptId},</if>
+            <if test="checkDate != null">#{checkDate, jdbcType=DATE},</if>
+            <if test="shift != null">#{shift},</if>
+            <if test="dutyLeader != null">#{dutyLeader},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-            <if test="deptId != null">#{deptId},</if>
-         </trim>
+        </trim>
     </insert>
 
     <update id="updateSixCheckRecord" parameterType="SixCheckRecord">
@@ -68,6 +82,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
+            <if test="checkDate != null">check_date = #{checkDate},</if>
+            <if test="shift != null and shift != ''">shift = #{shift},</if>
+            <if test="dutyLeader != null and dutyLeader != ''">duty_leader = #{dutyLeader},</if>
         </trim>
         where id = #{id}
     </update>

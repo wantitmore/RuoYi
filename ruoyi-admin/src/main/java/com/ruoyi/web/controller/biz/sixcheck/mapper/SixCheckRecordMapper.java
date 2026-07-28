@@ -1,6 +1,9 @@
 package com.ruoyi.web.controller.biz.sixcheck.mapper;
 
 import java.util.List;
+
+import org.apache.ibatis.annotations.Param;
+
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 
 /**
@@ -58,4 +61,7 @@ public interface SixCheckRecordMapper
      * @return 结果
      */
     public int deleteSixCheckRecordByIds(String[] ids);
+
+    List<SixCheckRecord> selectListByMonth(@Param("month") String month,
+                                       @Param("deptId") Long deptId);
 }

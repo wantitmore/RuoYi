@@ -1,11 +1,17 @@
 package com.ruoyi.web.controller.biz.sixcheck.controller;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +25,7 @@ import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecordWrapper;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckItemService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 import com.ruoyi.common.core.controller.BaseController;
@@ -49,9 +56,9 @@ public class SixCheckRecordController extends BaseController {
     @GetMapping("/input")
     public String input(ModelMap mmap) {
         // 判断当前用户是否拥有 sixcheck:record:edit 权限
-        boolean canEdit = ShiroUtils.getSubject().isPermitted("sixcheck:record:edit");
-        mmap.put("canEdit", canEdit);
-        return "sixcheck/input"; // 跳转到我们创建的 input.html
+        mmap.put("canEdit", ShiroUtils.getSubject().isPermitted("sixcheck:record:edit"));
+        mmap.put("currentUserName", ShiroUtils.getSysUser().getUserName());
+        return "sixcheck/input";
     }
 
     @RequiresPermissions("sixcheck:record:view")
@@ -143,52 +150,138 @@ public class SixCheckRecordController extends BaseController {
 
     @GetMapping("/load")
     @ResponseBody
-    public AjaxResult load(@RequestParam String batchNo) {
-        // 查询所有检查项目
+    public AjaxResult load(@RequestParam("checkDate") @DateTimeFormat(pattern = "yyyy-MM-dd") Date checkDate,
+            @RequestParam String shift) {
+        // 查询本部门的检查项目
         SixCheckItem queryItem = new SixCheckItem();
         queryItem.setDeptId(ShiroUtils.getSysUser().getDeptId());
         List<SixCheckItem> items = sixCheckItemService.selectSixCheckItemList(queryItem);
-        // 查询该月份的已有记录
-        SixCheckRecord query = new SixCheckRecord();
-        query.setBatchNo(batchNo);
-        List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
-        // 转为 Map<itemId, recordValue>
+        items.sort(Comparator.comparing(SixCheckItem::getSortOrder));
+
+        // 查询该日期、该班次已有记录
+        SixCheckRecord queryRecord = new SixCheckRecord();
+        queryRecord.setCheckDate(checkDate);
+        queryRecord.setShift(shift);
+        queryRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
+        List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(queryRecord);
+
         Map<Long, String> recordMap = new HashMap<>();
+        String dutyLeader = "";
         for (SixCheckRecord r : records) {
             recordMap.put(r.getItemId(), r.getRecordValue());
         }
+        if (!records.isEmpty()) {
+            dutyLeader = records.get(0).getDutyLeader() != null ? records.get(0).getDutyLeader() : "";
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("items", items);
         result.put("records", recordMap);
+        result.put("dutyLeader", dutyLeader);
         return success().put("data", result);
     }
 
+    @RequiresPermissions("sixcheck:record:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(@RequestBody List<SixCheckRecord> recordList) {
-        if (!ShiroUtils.getSubject().isPermitted("sixcheck:record:edit")) {
-            return error("您没有权限编辑六必查记录");
+    public AjaxResult save(@RequestBody SixCheckRecordWrapper wrapper) {
+        if (wrapper.getDutyLeader() == null || wrapper.getDutyLeader().trim().isEmpty()) {
+            return error("值班领导不能为空");
         }
-        for (SixCheckRecord r : recordList) {
-            // 检查是否存在相同 item_id + batch_no 的记录
+        for (SixCheckRecord r : wrapper.getRecordList()) {
+            r.setDeptId(ShiroUtils.getSysUser().getDeptId());
+            r.setCheckDate(wrapper.getCheckDate());
+            r.setShift(wrapper.getShift());
+            r.setDutyLeader(wrapper.getDutyLeader());
+
+            // 检查是否存在相同 item_id + check_date + shift + dept_id 的记录
             SixCheckRecord exist = new SixCheckRecord();
             exist.setItemId(r.getItemId());
-            exist.setBatchNo(r.getBatchNo());
-            r.setDeptId(ShiroUtils.getSysUser().getDeptId());
-            exist.setDeptId(ShiroUtils.getSysUser().getDeptId());
+            exist.setCheckDate(r.getCheckDate());
+            exist.setShift(r.getShift());
+            exist.setDeptId(r.getDeptId());
             List<SixCheckRecord> list = sixCheckRecordService.selectSixCheckRecordList(exist);
+
             if (list.size() > 0) {
-                // 更新
                 SixCheckRecord update = list.get(0);
                 update.setRecordValue(r.getRecordValue());
+                update.setDutyLeader(r.getDutyLeader());
                 update.setUpdateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.updateSixCheckRecord(update);
             } else {
-                // 插入
                 r.setCreateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.insertSixCheckRecord(r);
             }
         }
         return success("保存成功");
+    }
+
+    @RequiresPermissions("sixcheck:summary")
+    @GetMapping("/summary")
+    public String summary() {
+        return "sixcheck/summary";
+    }
+
+    @RequiresPermissions("sixcheck:summary")
+    @GetMapping("/summary/data")
+    @ResponseBody
+    public AjaxResult summaryData(@RequestParam String month,
+            @RequestParam(required = false) Long deptId) {
+        if (!ShiroUtils.getSysUser().isAdmin()) {
+            deptId = ShiroUtils.getSysUser().getDeptId();
+        }
+
+        List<SixCheckRecord> records = sixCheckRecordService.selectListByMonth(month, deptId);
+
+        // 获取检查项目（本部门优先）
+        SixCheckItem queryItem = new SixCheckItem();
+        if (deptId != null)
+            queryItem.setDeptId(deptId);
+        List<SixCheckItem> items = sixCheckItemService.selectSixCheckItemList(queryItem);
+        if (items.isEmpty()) {
+            items = sixCheckItemService.selectSixCheckItemList(new SixCheckItem());
+        }
+        items.sort(Comparator.comparing(SixCheckItem::getSortOrder));
+
+        // 按项目分组，并过滤异常记录
+        Map<Long, List<SixCheckRecord>> grouped = new LinkedHashMap<>();
+        for (SixCheckItem item : items) {
+            grouped.put(item.getId(), new ArrayList<>());
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MM-dd");
+        for (SixCheckRecord r : records) {
+            String val = r.getRecordValue();
+            if (val != null && !val.trim().isEmpty() && !val.trim().equals("正常")) {
+                if (grouped.containsKey(r.getItemId())) {
+                    grouped.get(r.getItemId()).add(r);
+                }
+            }
+        }
+
+        // 组装返回数据
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (SixCheckItem item : items) {
+            List<SixCheckRecord> recs = grouped.get(item.getId());
+            // 无异常的项目跳过
+            if (recs.isEmpty())
+                continue;
+
+            Map<String, Object> itemMap = new HashMap<>();
+            itemMap.put("itemName", item.getName());
+            List<Map<String, String>> detailList = new ArrayList<>();
+            for (SixCheckRecord rec : recs) {
+                Map<String, String> detail = new HashMap<>();
+                detail.put("shift", rec.getShift() != null ? rec.getShift() : "");
+                detail.put("leader", rec.getDutyLeader() != null ? rec.getDutyLeader() : "");
+                detail.put("content", rec.getRecordValue());
+                detail.put("date", sdf.format(rec.getCheckDate()));
+                detailList.add(detail);
+            }
+            itemMap.put("details", detailList);
+            result.add(itemMap);
+        }
+
+        return success().put("data", result);
     }
 }

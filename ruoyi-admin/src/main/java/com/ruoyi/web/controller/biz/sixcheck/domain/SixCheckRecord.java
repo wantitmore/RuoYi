@@ -1,5 +1,7 @@
 package com.ruoyi.web.controller.biz.sixcheck.domain;
 
+import java.util.Date;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -30,6 +32,35 @@ public class SixCheckRecord extends BaseEntity {
     private String batchNo;
 
     private Long deptId;
+
+    private Date checkDate; // 值班日期
+    private String shift; // 值班班次
+    private String dutyLeader; // 值班领导
+
+    // getter/setter
+    public Date getCheckDate() {
+        return checkDate;
+    }
+
+    public void setCheckDate(Date checkDate) {
+        this.checkDate = checkDate;
+    }
+
+    public String getShift() {
+        return shift;
+    }
+
+    public void setShift(String shift) {
+        this.shift = shift;
+    }
+
+    public String getDutyLeader() {
+        return dutyLeader;
+    }
+
+    public void setDutyLeader(String dutyLeader) {
+        this.dutyLeader = dutyLeader;
+    }
 
     public Long getDeptId() {
         return deptId;

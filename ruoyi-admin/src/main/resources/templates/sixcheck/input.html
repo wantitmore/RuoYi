@@ -11,14 +11,30 @@
             <div class="col-sm-12">
                 <div class="ibox">
                     <div class="ibox-title">
-                        <h5>六必查录入</h5>
+                        <h5>值班领导六必查录入</h5>
                     </div>
                     <div class="ibox-content">
                         <div class="form-horizontal">
                             <div class="form-group">
-                                <label class="col-sm-1 control-label">月份：</label>
+                                <label class="col-sm-1 control-label">值班日期：</label>
                                 <div class="col-sm-2">
-                                    <input type="month" id="batchNo" class="form-control" />
+                                    <input type="date" id="checkDate" class="form-control" />
+                                </div>
+                                <label class="col-sm-1 control-label">值班班次：</label>
+                                <div class="col-sm-2">
+                                    <select id="shift" class="form-control">
+                                        <option value="">请选择班次</option>
+                                        <option value="A班">A班</option>
+                                        <option value="B班">B班</option>
+                                        <option value="C班">C班</option>
+                                        <option value="AC班">AC班</option>
+                                        <option value="BC班">BC班</option>
+                                    </select>
+                                </div>
+                                <label class="col-sm-1 control-label">值班领导：</label>
+                                <div class="col-sm-2">
+                                    <input type="text" id="dutyLeader" class="form-control" required
+                                        th:value="${currentUserName}" th:attr="data-default=${currentUserName}" />
                                 </div>
                                 <div class="col-sm-2">
                                     <button class="btn btn-primary" onclick="loadData()">
@@ -56,22 +72,39 @@
 
         $(function () {
             var now = new Date();
-            var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
-            $("#batchNo").val(month);
+            var today = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+            $("#checkDate").val(today);
+
+            // loadData();
+            $("#shift").on('change', function () {
+                loadData();
+            });
         });
 
         function loadData() {
-            var batchNo = $("#batchNo").val();
-            if (!batchNo) { alert("请选择月份"); return; }
-            $.get(ctx + "sixcheck/record/load", { batchNo: batchNo }, function (res) {
+            var checkDate = $("#checkDate").val();
+            var shift = $("#shift").val();
+            if (!checkDate || !shift) { alert("请选择值班日期和班次"); return; }
+            $.get(ctx + "sixcheck/record/load", { checkDate: checkDate, shift: shift }, function (res) {
                 if (res.code != 0) { alert("加载失败"); return; }
                 var items = res.data.items;
                 var records = res.data.records;
+                var dutyLeader = res.data.dutyLeader || '';
+                if (dutyLeader) {
+                    $("#dutyLeader").val(dutyLeader);
+                } else {
+                    // 没有历史数据时，重置为默认值（当前登录用户名）
+                    $("#dutyLeader").val($("#dutyLeader").attr("data-default") || "");
+                }
                 var html = '';
                 var readonlyAttr = canEdit ? '' : 'readonly';
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     var recordValue = records[item.id] || '';
+                    // 如果为空或空白，默认显示“正常”
+                    if (recordValue.trim() === '') {
+                        recordValue = '正常';
+                    }
                     html += '<tr>';
                     html += '<td style="width: 30px;">' + (i + 1) + '</td>';
                     html += '<td style="width: 20%;">' + item.name + '</td>';
@@ -87,8 +120,14 @@
         }
 
         function saveData() {
-            var batchNo = $("#batchNo").val();
-            if (!batchNo) { alert("请选择月份"); return; }
+            var checkDate = $("#checkDate").val();
+            var shift = $("#shift").val();
+            var dutyLeader = $("#dutyLeader").val();
+            if (!checkDate || !shift) { alert("请选择值班日期和班次"); return; }
+            if (!dutyLeader || dutyLeader.trim() === '') {
+                alert("值班领导不能为空");
+                return;
+            }
             var recordList = [];
             $("#tableBody textarea").each(function () {
                 var itemId = $(this).data('item-id');
@@ -97,7 +136,6 @@
                     recordList.push({
                         itemId: itemId,
                         recordValue: value,
-                        batchNo: batchNo
                     });
                 }
             });
@@ -106,7 +144,12 @@
                 url: ctx + "sixcheck/record/save",
                 type: "POST",
                 contentType: "application/json",
-                data: JSON.stringify(recordList),
+                data: JSON.stringify({
+                    checkDate: checkDate,
+                    shift: shift,
+                    dutyLeader: dutyLeader,
+                    recordList: recordList
+                }),
                 success: function (res) {
                     if (res.code == 0) alert("保存成功！");
                     else alert("保存失败：" + res.msg);

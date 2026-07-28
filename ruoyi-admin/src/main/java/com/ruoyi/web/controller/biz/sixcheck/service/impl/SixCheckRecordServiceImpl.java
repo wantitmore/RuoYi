@@ -16,8 +16,7 @@ import com.ruoyi.common.core.text.Convert;
  * @date 2026-07-01
  */
 @Service
-public class SixCheckRecordServiceImpl implements ISixCheckRecordService 
-{
+public class SixCheckRecordServiceImpl implements ISixCheckRecordService {
     @Autowired
     private SixCheckRecordMapper sixCheckRecordMapper;
 
@@ -28,8 +27,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 六必查记录
      */
     @Override
-    public SixCheckRecord selectSixCheckRecordById(Long id)
-    {
+    public SixCheckRecord selectSixCheckRecordById(Long id) {
         return sixCheckRecordMapper.selectSixCheckRecordById(id);
     }
 
@@ -40,8 +38,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 六必查记录
      */
     @Override
-    public List<SixCheckRecord> selectSixCheckRecordList(SixCheckRecord sixCheckRecord)
-    {
+    public List<SixCheckRecord> selectSixCheckRecordList(SixCheckRecord sixCheckRecord) {
         return sixCheckRecordMapper.selectSixCheckRecordList(sixCheckRecord);
     }
 
@@ -52,8 +49,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 结果
      */
     @Override
-    public int insertSixCheckRecord(SixCheckRecord sixCheckRecord)
-    {
+    public int insertSixCheckRecord(SixCheckRecord sixCheckRecord) {
         sixCheckRecord.setCreateTime(DateUtils.getNowDate());
         return sixCheckRecordMapper.insertSixCheckRecord(sixCheckRecord);
     }
@@ -65,8 +61,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 结果
      */
     @Override
-    public int updateSixCheckRecord(SixCheckRecord sixCheckRecord)
-    {
+    public int updateSixCheckRecord(SixCheckRecord sixCheckRecord) {
         sixCheckRecord.setUpdateTime(DateUtils.getNowDate());
         return sixCheckRecordMapper.updateSixCheckRecord(sixCheckRecord);
     }
@@ -78,8 +73,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 结果
      */
     @Override
-    public int deleteSixCheckRecordByIds(String ids)
-    {
+    public int deleteSixCheckRecordByIds(String ids) {
         return sixCheckRecordMapper.deleteSixCheckRecordByIds(Convert.toStrArray(ids));
     }
 
@@ -90,8 +84,12 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService
      * @return 结果
      */
     @Override
-    public int deleteSixCheckRecordById(Long id)
-    {
+    public int deleteSixCheckRecordById(Long id) {
         return sixCheckRecordMapper.deleteSixCheckRecordById(id);
+    }
+
+    @Override
+    public List<SixCheckRecord> selectListByMonth(String month, Long deptId) {
+        return sixCheckRecordMapper.selectListByMonth(month, deptId);
     }
 }

@@ -24,6 +24,8 @@ ALTER TABLE positive_negative ADD COLUMN dept_id bigint(20) DEFAULT NULL COMMENT
 
 
 
+
+
 --量化考核
 -- 1. 清空已有数据
 TRUNCATE TABLE kpi_score;
@@ -80,7 +82,7 @@ CROSS JOIN (
     UNION ALL SELECT '未落实警察直接管理要求', 20, 'NUMBER', '一岗一责处置', '视情节予以扣1-3分'
     UNION ALL SELECT '存在脱岗、串岗行为', 20, 'NUMBER', '一岗一责处置', '视情节予以扣1-3分'
     UNION ALL SELECT '其他未按要求落实一岗一责处置工作', 20, 'NUMBER', '一岗一责处置', '视情节予以扣1-3分'
-    UNION ALL SELECT '存在上述条款未列明，未落实“两个职责”相关工作情形', 20, 'NUMBER', '其他履职事项', '视情节予以扣1-5分'
+    UNION ALL SELECT '其它未落实“两个职责”相关工作情形', 20, 'NUMBER', '其他履职事项', '视情节予以扣1-5分'
 ) proj;
 
 --考核类别
@@ -172,3 +174,113 @@ AND NOT EXISTS (
     SELECT 1 FROM sys_role_menu rm
     WHERE rm.role_id = 1 AND rm.menu_id = sys_menu.menu_id
 );
+
+--增加其他履职事项 增加项目
+INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, remark, create_by, create_time)
+SELECT proj.name, proj.max_score, proj.score_type, d.dept_id, proj.category, '', 'admin', NOW()
+FROM sys_dept d
+CROSS JOIN (
+    SELECT '正面清单' AS name, 20 AS max_score, 'NUMBER' AS score_type, '其他履职事项' AS category
+    UNION ALL SELECT '负面清单', 20, 'NUMBER', '其他履职事项'
+    UNION ALL SELECT '问题通报', 20, 'NUMBER', '其他履职事项'
+) proj
+WHERE d.del_flag = '0'
+  AND NOT EXISTS (SELECT 1 FROM kpi_item existing WHERE existing.dept_id = d.dept_id AND existing.name = proj.name);
+
+--修改菜单名称
+-- 修改一级菜单名称
+UPDATE sys_menu SET menu_name = '值班领导六必查' WHERE menu_name = '六必查' AND menu_type = 'M';
+
+-- 修改子菜单名称（例如“六必查录入”、“六必查管理”等，如果有的话）
+UPDATE sys_menu SET menu_name = REPLACE(menu_name, '六必查', '值班领导六必查') WHERE menu_name LIKE '%六必查%' AND menu_type = 'C';
+
+--修改六必查功能
+-- 增加新字段
+-- =====================================================
+-- 值班领导六必查模块数据库更新脚本
+-- 包含：表结构调整、唯一约束更新、检查项目重置
+-- =====================================================
+
+-- =====================================================
+-- 值班领导六必查模块数据库更新脚本（内网直接执行版）
+-- 执行前请备份 six_check_item 和 six_check_record 表
+-- 如果某条语句报错（如字段已存在、索引已存在），可忽略继续执行下一条
+-- =====================================================
+
+-- 1. 增加新字段（如果已存在会报错，忽略即可）
+ALTER TABLE six_check_record ADD COLUMN check_date  date         DEFAULT NULL COMMENT '值班日期';
+ALTER TABLE six_check_record ADD COLUMN shift       varchar(10)  DEFAULT NULL COMMENT '值班班次（A班/B班/C班）';
+ALTER TABLE six_check_record ADD COLUMN duty_leader varchar(50)  DEFAULT NULL COMMENT '值班领导';
+
+-- 2. 删除旧的唯一约束（如果不存在会报错，忽略即可）
+ALTER TABLE six_check_record DROP INDEX uk_item_month_dept;
+
+-- 3. 创建新的唯一约束（如果已存在会报错，忽略即可）
+ALTER TABLE six_check_record ADD UNIQUE KEY uk_item_date_shift_dept (item_id, check_date, shift, dept_id);
+
+-- 4. 清空旧检查项目并插入7项新内容
+TRUNCATE TABLE six_check_item;
+
+INSERT INTO six_check_item (dept_id, name, sort_order, create_by, create_time)
+SELECT d.dept_id, proj.name, proj.sort_order, 'admin', NOW()
+FROM sys_dept d
+CROSS JOIN (
+    SELECT '值班民警到岗到位、履行岗位职责、规范佩戴和使用警戒具情况' AS name, 1 AS sort_order
+    UNION ALL SELECT '值班民警“三大现场”直接管理、规范执法和现场管理秩序情况', 2
+    UNION ALL SELECT '值班民警落实五个重点、安全隐患排查及整改情况', 3
+    UNION ALL SELECT '值班民警生产组织、队列指挥、搜身讲评情况', 4
+    UNION ALL SELECT '值班民警狱情排查及处置、执勤日志登记和交接情况', 5
+    UNION ALL SELECT '监狱和监区交办的重点问题整改和重点工作推进情况', 6
+    UNION ALL SELECT '监狱值班组巡查情况', 7
+) proj
+WHERE d.del_flag = '0';
+
+ALTER TABLE six_check_record MODIFY COLUMN batch_no varchar(7) DEFAULT NULL COMMENT '考核批次（已废弃）';
+
+--六必查月汇总
+
+SET @parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '值班领导六必查' AND menu_type = 'M');
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark)
+VALUES ('六必查月汇总', @parent_id, 2, 'C', '0', 'sixcheck/record/summary', 'sixcheck:summary', '#', 'admin', NOW(), '', NULL, '');
+
+-- 1. 先查出父菜单ID并保存到变量
+SET @parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '六必查月汇总');
+
+-- 2. 使用变量插入按钮菜单
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark)
+VALUES ('六必查汇总查询', @parent_id, 1, 'F', '0', '', 'sixcheck:summary', '#', 'admin', NOW(), '', NULL, '');
+
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id FROM sys_menu WHERE menu_name LIKE '%六必查月汇总%'
+AND NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = 1 AND menu_id = sys_menu.menu_id);
+
+
+
+--复制107
+INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, work_requirement, remark, create_by, create_time)
+SELECT name, max_score, score_type, 108, category, work_requirement, remark, 'admin', NOW()
+FROM kpi_item
+WHERE dept_id = 107
+  AND NOT EXISTS (
+      SELECT 1 FROM kpi_item existing
+      WHERE existing.dept_id = 108 AND existing.name = kpi_item.name
+  );
+
+  INSERT INTO six_check_item (dept_id, name, sort_order, create_by, create_time)
+SELECT 108, name, sort_order, 'admin', NOW()
+FROM six_check_item
+WHERE dept_id = 107
+  AND NOT EXISTS (
+      SELECT 1 FROM six_check_item si
+      WHERE si.dept_id = 108 AND si.name = six_check_item.name
+  );
+
+  INSERT INTO video_check_item (dept_id, check_position, specific_content, sort_order, create_by, create_time)
+SELECT 108, check_position, specific_content, sort_order, 'admin', NOW()
+FROM video_check_item
+WHERE dept_id = 107
+  AND NOT EXISTS (
+      SELECT 1 FROM video_check_item vci
+      WHERE vci.dept_id = 108 AND vci.check_position = video_check_item.check_position
+  );
