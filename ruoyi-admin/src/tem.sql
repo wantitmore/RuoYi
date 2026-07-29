@@ -257,7 +257,7 @@ AND NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = 1 AND menu_id = sys_
 
 
 
---复制107
+--复制107三个项目
 INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, work_requirement, remark, create_by, create_time)
 SELECT name, max_score, score_type, 108, category, work_requirement, remark, 'admin', NOW()
 FROM kpi_item
@@ -283,4 +283,19 @@ WHERE dept_id = 107
   AND NOT EXISTS (
       SELECT 1 FROM video_check_item vci
       WHERE vci.dept_id = 108 AND vci.check_position = video_check_item.check_position
+  );
+
+  --六必查更改 1. 把“监狱值班组巡查情况”改为“上级问题通报”
+UPDATE six_check_item
+SET name = '上级问题通报'
+WHERE name = '监狱值班组巡查情况';
+
+-- 2. 为每个部门增加“其它”这一项（sort_order 设为 8，避免重复插入）
+INSERT INTO six_check_item (dept_id, name, sort_order, create_by, create_time)
+SELECT d.dept_id, '其它', 8, 'admin', NOW()
+FROM sys_dept d
+WHERE d.del_flag = '0'
+  AND NOT EXISTS (
+      SELECT 1 FROM six_check_item si
+      WHERE si.dept_id = d.dept_id AND si.name = '其它'
   );

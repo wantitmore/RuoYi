@@ -35,12 +35,14 @@
                                             th:text="${post.postName}"></option>
                                     </select>
                                 </div>
-                                <div class="col-sm-2">
+                                <div class="col-sm-2" style="display: flex; gap: 50px;">
                                     <button type="button" class="btn btn-primary" onclick="search()">
                                         <i class="fa fa-search"></i> 查询
                                     </button>
+                                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                                        <i class="fa fa-file-excel-o"></i> 导出Excel
+                                    </button>
                                 </div>
-                            </div>
                         </div>
                         <div class="table-responsive">
                             <table id="summaryTable" class="table table-bordered table-hover" style="display:none;">
@@ -93,7 +95,7 @@
 
             $.get(ctx + "kpi/score/personDetail", { batchNo: batchNo, userId: userId }, function (res) {
                 if (res.code != 0) { alert("加载详情失败"); return; }
-                var details = res.data; 
+                var details = res.data;
                 var content = '<table class="table table-bordered table-striped">';
                 content += '<thead><tr><th>考核项目</th><th>得分</th><th>备注</th></tr></thead><tbody>';
                 for (var i = 0; i < details.length; i++) {
@@ -170,6 +172,23 @@
                     document.getElementById("summaryTable").style.display = "";
                 })
                 .catch(err => alert("请求失败：" + err.message));
+        }
+        function exportExcel() {
+            var batchNo = document.getElementById("batchNo").value;
+            var deptId = document.getElementById("deptSelect").value;
+            var postId = document.getElementById("postSelect").value;   // 新增：获取岗位
+            if (!batchNo) {
+                alert("请选择月份");
+                return;
+            }
+            var url = ctx + "kpi/score/summary/export?batchNo=" + encodeURIComponent(batchNo);
+            if (deptId) {
+                url += "&deptId=" + encodeURIComponent(deptId);
+            }
+            if (postId) {
+                url += "&postId=" + encodeURIComponent(postId);
+            }
+            window.location.href = url;
         }
     </script>
 </body>

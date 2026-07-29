@@ -16,7 +16,6 @@ public class ScoreSummary {
     @Excel(name = "总分")
     private Double totalScore;
 
-    @Excel(name = "考核项目数")
     private Integer itemCount;
 
     @Excel(name = "岗位")

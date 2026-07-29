@@ -147,4 +147,5 @@ public class KpiScore extends BaseEntity {
                 .append("updateTime", getUpdateTime())
                 .toString();
     }
+
 }

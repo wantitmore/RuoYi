@@ -58,6 +58,7 @@ public class SixCheckRecordController extends BaseController {
         // 判断当前用户是否拥有 sixcheck:record:edit 权限
         mmap.put("canEdit", ShiroUtils.getSubject().isPermitted("sixcheck:record:edit"));
         mmap.put("currentUserName", ShiroUtils.getSysUser().getUserName());
+        mmap.put("currentDeptId", ShiroUtils.getSysUser().getDeptId());
         return "sixcheck/input";
     }
 

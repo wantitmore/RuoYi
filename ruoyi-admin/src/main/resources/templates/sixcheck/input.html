@@ -50,6 +50,7 @@
                                         <th style="width: 30px;">序号</th>
                                         <th style="width: 20%;">检查项目</th>
                                         <th style="width: 70%;">记录内容</th>
+                                        <th style="width: 80px;">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tableBody"></tbody>
@@ -60,6 +61,8 @@
                                 </button>
                             </div>
                         </div>
+                        <!-- 关联扣分弹窗 -->
+
                     </div>
                 </div>
             </div>
@@ -108,7 +111,11 @@
                     html += '<tr>';
                     html += '<td style="width: 30px;">' + (i + 1) + '</td>';
                     html += '<td style="width: 20%;">' + item.name + '</td>';
-                    html += '<td style="width: 70%;"><textarea class="form-control" data-item-id="' + item.id + '" rows="3">' + recordValue + '</textarea></td>';
+                    html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3">' + recordValue + '</textarea></td>';
+                    // 如果当前用户有扣分权限，显示按钮
+                    if (canEdit) {
+                        html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', \'' + (dutyLeader || '') + '\')"><i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
+                    }
                     html += '</tr>';
                 }
                 $("#tableBody").html(html);
@@ -156,6 +163,125 @@
                 }
             });
         }
+
+
+        // 打开扣分弹窗
+        function openDeductModal(checkItemName, defaultUserName) {
+            // 获取部门ID
+            var deptId = [[${ currentDeptId }]]; // 确保后端已传入 currentDeptId
+            if (!deptId) {
+                alert("无法获取部门信息");
+                return;
+            }
+
+            // 同时加载用户和考核项目
+            $.when(
+                $.get(ctx + "kpi/score/getUsersByDept?deptId=" + deptId),
+                $.get(ctx + "kpi/score/getItemsByDept?deptId=" + deptId)
+            ).done(function (usersRes, itemsRes) {
+                var users = usersRes[0].data || [];
+                var items = itemsRes[0].data || [];
+
+                // 渲染被考核人下拉
+                var userOptions = '<option value="">请选择</option>';
+                $.each(users, function (i, u) {
+                    var selected = (u.userName === defaultUserName) ? ' selected' : '';
+                    userOptions += '<option value="' + u.userId + '"' + selected + '>' + u.userName + '</option>';
+                });
+
+                // 提取类别
+                var categories = [];
+                $.each(items, function (i, item) {
+                    if (item.category && categories.indexOf(item.category) === -1) {
+                        categories.push(item.category);
+                    }
+                });
+                var catOptions = '<option value="">请选择类别</option>';
+                $.each(categories, function (i, cat) {
+                    catOptions += '<option value="' + cat + '">' + cat + '</option>';
+                });
+
+                var contentHtml = '<div style="padding:15px;">' +
+                    '<form class="form-horizontal">' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">被考核人：</label><div class="col-sm-8"><select id="deductUserId" class="form-control">' + userOptions + '</select></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">考核类别：</label><div class="col-sm-8"><select id="deductCategory" class="form-control">' + catOptions + '</select></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">考核项目：</label><div class="col-sm-8"><select id="deductItemId" class="form-control"><option value="">请先选择类别</option></select></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">分数：</label><div class="col-sm-8"><input type="number" id="deductScore" class="form-control" step="0.5" min="-10" max="10" /></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">备注：</label><div class="col-sm-8"><textarea id="deductRemark" class="form-control" rows="2"></textarea></div></div>' +
+                    '</form></div>';
+
+                layer.open({
+                    type: 1,
+                    title: '关联加扣分 - ' + checkItemName,
+                    shadeClose: false,
+                    shade: 0.3,
+                    area: ['550px', '400px'],
+                    btn: ['确定', '取消'],
+                    content: contentHtml,
+                    yes: function (index, layero) {
+                        var userId = $(layero).find('#deductUserId').val();
+                        var itemId = $(layero).find('#deductItemId').val();
+                        var score = $(layero).find('#deductScore').val();
+                        var remark = $(layero).find('#deductRemark').val();
+                        if (!userId || !itemId || !score) {
+                            alert("请填写完整信息");
+                            return;
+                        }
+                        $.ajax({
+                            url: ctx + "kpi/score/quickDeduct",
+                            type: "POST",
+                            contentType: "application/json",
+                            data: JSON.stringify({
+                                userId: userId,
+                                itemId: itemId,
+                                score: parseFloat(score),
+                                remark: remark
+                            }),
+                            success: function (res) {
+                                if (res.code == 0) {
+                                    alert("加扣分成功！");
+                                    layer.close(index);
+                                } else {
+                                    alert("操作失败：" + res.msg);
+                                }
+                            }
+                        });
+                    },
+                    btn2: function (index) {
+                        layer.close(index);
+                    },
+                    success: function (layero, index) {
+                        $(layero).find('#deductCategory').on('change', function () {
+                            var cat = $(this).val();
+                            var itemSelect = $(layero).find('#deductItemId');
+                            var html = '<option value="">请选择项目</option>';
+                            if (cat) {
+                                $.each(items, function (i, item) {
+                                    if (item.category === cat) {
+                                        html += '<option value="' + item.id + '">' + item.name + ' </option>';
+                                    }
+                                });
+                            }
+                            itemSelect.html(html);
+                        });
+                    }
+                });
+            });
+        }
+        // 类别切换时过滤项目
+        $("#deductCategory").on('change', function () {
+            var cat = $(this).val();
+            var html = '<option value="">请选择项目</option>';
+            if (cat) {
+                $.each(deptItems, function (i, item) {
+                    if (item.category === cat) {
+                        html += '<option value="' + item.id + '">' + item.name + '</option>';
+                    }
+                });
+            }
+            $("#deductItemId").html(html);
+        });
+
     </script>
 </body>
 

@@ -1,7 +1,9 @@
 package com.ruoyi.web.controller.biz.kpi.controller;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +23,12 @@ import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiItem;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.domain.QuickDeductDTO;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+
+import jakarta.servlet.http.HttpServletResponse;
+
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysDept;
@@ -328,5 +334,37 @@ public class KpiScoreController extends BaseController {
             details.add(item);
         }
         return success().put("data", details);
+    }
+
+    /**
+     * 六必查快速扣分接口
+     */
+    @RequiresPermissions("kpi:score:edit")
+    @PostMapping("/quickDeduct")
+    @ResponseBody
+    public AjaxResult quickDeduct(@RequestBody QuickDeductDTO dto) {
+        KpiScore score = new KpiScore();
+        score.setUserId(dto.getUserId());
+        score.setItemId(dto.getItemId());
+        score.setScore(dto.getScore());
+        score.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date())); // 自动取当前月份
+        score.setRemark(dto.getRemark());
+        score.setCreateBy(ShiroUtils.getLoginName());
+        return toAjax(kpiScoreService.insertKpiScore(score));
+    }
+
+    @RequiresPermissions("kpi:score:summary")
+    @GetMapping("/summary/export")
+    @ResponseBody
+    public void exportSummary(HttpServletResponse response,
+            @RequestParam String batchNo,
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) Long postId) { // 新增 postId
+        List<ScoreSummary> list = kpiScoreService.selectSummary(batchNo, deptId, postId);
+        for (int i = 0; i < list.size(); i++) {
+            list.get(i).setRank(i + 1);
+        }
+        ExcelUtil<ScoreSummary> util = new ExcelUtil<>(ScoreSummary.class);
+        util.exportExcel(response, list, "考核结果_" + batchNo);
     }
 }
