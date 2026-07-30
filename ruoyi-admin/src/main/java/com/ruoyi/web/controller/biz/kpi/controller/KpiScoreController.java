@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.kpi.controller;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,6 +27,8 @@ import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
 import com.ruoyi.web.controller.biz.kpi.domain.QuickDeductDTO;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -42,6 +45,10 @@ import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.common.core.page.TableDataInfo;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary;
+import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 
 /**
  * 考核分数Controller
@@ -68,6 +75,9 @@ public class KpiScoreController extends BaseController {
 
     @Autowired
     private ISysPostService postService;
+
+    @Autowired
+    private ISixCheckRecordService sixCheckRecordService;
 
     @RequiresPermissions("kpi:score:view")
     @GetMapping()
@@ -350,7 +360,67 @@ public class KpiScoreController extends BaseController {
         score.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date())); // 自动取当前月份
         score.setRemark(dto.getRemark());
         score.setCreateBy(ShiroUtils.getLoginName());
-        return toAjax(kpiScoreService.insertKpiScore(score));
+        kpiScoreService.insertKpiScore(score);
+
+        if (dto.getSixCheckItemId() != null && StringUtils.isNotBlank(dto.getCheckDate())
+                && StringUtils.isNotBlank(dto.getShift())) {
+            // 查询六必查记录
+            SixCheckRecord query = new SixCheckRecord();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            query.setItemId(dto.getSixCheckItemId());
+            try {
+                query.setCheckDate(sdf.parse(dto.getCheckDate()));
+            } catch (ParseException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            query.setShift(dto.getShift());
+            query.setDeptId(ShiroUtils.getSysUser().getDeptId());
+            List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
+
+            // 获取被考核人姓名
+            String userName = "";
+            SysUser user = userService.selectUserById(dto.getUserId());
+            if (user != null)
+                userName = user.getUserName();
+
+            // 构建扣分描述信息
+            String deductInfo = String.format("（关联扣分-%s-%s）",
+                    userName,
+                    StringUtils.defaultString(dto.getRemark(), "无备注"));
+
+            if (records.isEmpty()) {
+                // 之前没有记录，新建一条
+                SixCheckRecord newRecord = new SixCheckRecord();
+                newRecord.setItemId(dto.getSixCheckItemId());
+                try {
+                    newRecord.setCheckDate(sdf.parse(dto.getCheckDate()));
+                } catch (ParseException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                newRecord.setShift(dto.getShift());
+                newRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
+                newRecord.setDutyLeader(ShiroUtils.getSysUser().getUserName()); // 值班领导默认当前用户
+                newRecord.setRecordValue(deductInfo);
+                newRecord.setCreateBy(ShiroUtils.getLoginName());
+                sixCheckRecordService.insertSixCheckRecord(newRecord);
+            } else {
+                // 已有记录，追加内容
+                SixCheckRecord exist = records.get(0);
+                String oldValue = exist.getRecordValue();
+                if (StringUtils.isBlank(oldValue) || "正常".equals(oldValue)) {
+                    // 如果原内容为空或为“正常”，则直接设置为扣分信息
+                    exist.setRecordValue(deductInfo);
+                } else {
+                    // 否则在原有内容末尾换行追加
+                    exist.setRecordValue(oldValue + "\n" + deductInfo);
+                }
+                exist.setUpdateBy(ShiroUtils.getLoginName());
+                sixCheckRecordService.updateSixCheckRecord(exist);
+            }
+        }
+        return success("加扣分成功！");
     }
 
     @RequiresPermissions("kpi:score:summary")

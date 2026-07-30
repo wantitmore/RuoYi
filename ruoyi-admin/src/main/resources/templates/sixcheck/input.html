@@ -114,7 +114,7 @@
                     html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3">' + recordValue + '</textarea></td>';
                     // 如果当前用户有扣分权限，显示按钮
                     if (canEdit) {
-                        html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', \'' + (dutyLeader || '') + '\')"><i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
+                        html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', \'' + (dutyLeader || '') + '\', \'' + item.id + '\')"><i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
                     }
                     html += '</tr>';
                 }
@@ -166,13 +166,18 @@
 
 
         // 打开扣分弹窗
-        function openDeductModal(checkItemName, defaultUserName) {
+        function openDeductModal(checkItemName, defaultUserName, sixCheckItemId) {
             // 获取部门ID
             var deptId = [[${ currentDeptId }]]; // 确保后端已传入 currentDeptId
             if (!deptId) {
                 alert("无法获取部门信息");
                 return;
             }
+            window._currentDeductInfo = {
+                sixCheckItemId: sixCheckItemId,
+                checkDate: $("#checkDate").val(),
+                shift: $("#shift").val()
+            };
 
             // 同时加载用户和考核项目
             $.when(
@@ -235,12 +240,18 @@
                                 userId: userId,
                                 itemId: itemId,
                                 score: parseFloat(score),
-                                remark: remark
+                                remark: remark,
+                                sixCheckItemId: window._currentDeductInfo ? window._currentDeductInfo.sixCheckItemId : null,
+                                checkDate: window._currentDeductInfo ? window._currentDeductInfo.checkDate : null,
+                                shift: window._currentDeductInfo ? window._currentDeductInfo.shift : null
                             }),
                             success: function (res) {
                                 if (res.code == 0) {
                                     alert("加扣分成功！");
                                     layer.close(index);
+                                    if (typeof loadData === 'function') {
+                                        loadData();
+                                    }
                                 } else {
                                     alert("操作失败：" + res.msg);
                                 }
