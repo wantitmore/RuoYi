@@ -117,6 +117,41 @@
         .remark-popover .btn-row button {
             margin-left: 6px;
         }
+
+        .wrapper,
+        .wrapper-content,
+        .ibox,
+        .ibox-content,
+        .table-responsive {
+            overflow-y: visible !important;
+        }
+
+        /* 强制表格外层容器产生纵向滚动条 */
+        #scoreTableWrapper {
+            max-height: calc(100vh - 250px);
+            /* 高度 = 视口高度 - 顶部筛选区高度 */
+            overflow-y: auto !important;
+            /* 超出高度就出现垂直滚动条 */
+            position: relative;
+            /* 为 sticky 提供定位参考 */
+            margin-top: 10px;
+        }
+
+        /* 人员列在横向滚动时固定 */
+        .score-cell.person {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background-color: #fff;
+            /* 必须有背景色，否则透明 */
+        }
+
+        /* 确保表格宽度足够产生横向滚动条（如果列很多） */
+        #scoreTable {
+            width: max-content;
+            min-width: 100%;
+        }
     </style>
 
     <div class="wrapper wrapper-content animated fadeInRight">
@@ -254,7 +289,8 @@
                 var html = '';
 
                 // 表头行
-                html += '<div class="score-row score-header">';
+                //html += '<div class="score-row score-header">';
+                html += '<div class="score-row score-header" style="position: -webkit-sticky; position: sticky; top: 0; z-index: 999; background-color: #f5f5f5; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">';
                 html += '<div class="score-cell person">人员</div>';
                 for (var i = 0; i < items.length; i++) {
                     html += '<div class="score-cell item">' + items[i].name +
