@@ -10,6 +10,7 @@ public class QuickDeductDTO {
     private Long sixCheckItemId; // 检查项ID（对应 six_check_item 的 item_id）
     private String checkDate; // 值班日期（yyyy-MM-dd）
     private String shift; // 班次
+    private String currentRecordValue;
 
     public Long getUserId() {
         return userId;
@@ -65,6 +66,14 @@ public class QuickDeductDTO {
 
     public void setShift(String shift) {
         this.shift = shift;
+    }
+
+    public String getCurrentRecordValue() {
+        return currentRecordValue;
+    }
+
+    public void setCurrentRecordValue(String currentRecordValue) {
+        this.currentRecordValue = currentRecordValue;
     }
 
     

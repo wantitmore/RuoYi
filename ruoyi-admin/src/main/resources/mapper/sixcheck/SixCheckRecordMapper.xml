@@ -29,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="recordValue != null and recordValue != ''">AND record_value = #{recordValue}</if>
             <if test="batchNo != null and batchNo != ''">AND batch_no = #{batchNo}</if>
             <if test="deptId != null">AND dept_id = #{deptId}</if>
-            <if test="checkDate != null">AND check_date = #{checkDate, jdbcType=DATE}</if>
+            <if test="checkDate != null">AND DATE(check_date) = #{checkDate, jdbcType=DATE}</if>
             <if test="shift != null and shift != ''">AND shift = #{shift}</if>
             <if test="dutyLeader != null and dutyLeader != ''">AND duty_leader = #{dutyLeader}</if>
         </trim>

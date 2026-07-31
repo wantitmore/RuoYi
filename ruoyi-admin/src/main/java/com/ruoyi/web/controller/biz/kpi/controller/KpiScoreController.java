@@ -353,6 +353,10 @@ public class KpiScoreController extends BaseController {
     @PostMapping("/quickDeduct")
     @ResponseBody
     public AjaxResult quickDeduct(@RequestBody QuickDeductDTO dto) {
+        // if (dto.getSixCheckItemId() == null) {
+        // return error("六必查检查项ID不能为空");
+        // }
+        System.out.println("sixCheckItemId = " + dto.getSixCheckItemId());
         KpiScore score = new KpiScore();
         score.setUserId(dto.getUserId());
         score.setItemId(dto.getItemId());
@@ -361,6 +365,11 @@ public class KpiScoreController extends BaseController {
         score.setRemark(dto.getRemark());
         score.setCreateBy(ShiroUtils.getLoginName());
         kpiScoreService.insertKpiScore(score);
+
+        System.out.println("查询条件 itemId=" + dto.getSixCheckItemId() +
+                " checkDate=" + dto.getCheckDate() +
+                " shift=" + dto.getShift() +
+                " deptId=" + ShiroUtils.getSysUser().getDeptId());
 
         if (dto.getSixCheckItemId() != null && StringUtils.isNotBlank(dto.getCheckDate())
                 && StringUtils.isNotBlank(dto.getShift())) {
@@ -377,6 +386,7 @@ public class KpiScoreController extends BaseController {
             query.setShift(dto.getShift());
             query.setDeptId(ShiroUtils.getSysUser().getDeptId());
             List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
+            System.out.println("查询结果数量=" + records.size());
 
             // 获取被考核人姓名
             String userName = "";
@@ -385,14 +395,14 @@ public class KpiScoreController extends BaseController {
                 userName = user.getUserName();
 
             // 构建扣分描述信息
-            String deductInfo = String.format("（关联扣分-%s-%s）",
+            String deductInfo = String.format("（关联加扣分-%s-%s）",
                     userName,
                     StringUtils.defaultString(dto.getRemark(), "无备注"));
 
             if (records.isEmpty()) {
-                // 之前没有记录，新建一条
                 SixCheckRecord newRecord = new SixCheckRecord();
-                newRecord.setItemId(dto.getSixCheckItemId());
+                // ... 设置 itemId, checkDate, shift, deptId 等
+                newRecord.setItemId(dto.getSixCheckItemId()); // ★ 这一行必须存在
                 try {
                     newRecord.setCheckDate(sdf.parse(dto.getCheckDate()));
                 } catch (ParseException e) {
@@ -401,23 +411,37 @@ public class KpiScoreController extends BaseController {
                 }
                 newRecord.setShift(dto.getShift());
                 newRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
-                newRecord.setDutyLeader(ShiroUtils.getSysUser().getUserName()); // 值班领导默认当前用户
-                newRecord.setRecordValue(deductInfo);
+                newRecord.setDutyLeader(ShiroUtils.getSysUser().getUserName());
+                // 以输入框内容为基础（如果有），否则基础为空
+                String baseValue = StringUtils.defaultString(dto.getCurrentRecordValue(), "");
+                if (StringUtils.isNotBlank(baseValue) && !"正常".equals(baseValue)) {
+                    newRecord.setRecordValue(baseValue + "\n" + deductInfo);
+                } else {
+                    newRecord.setRecordValue(deductInfo);
+                }
                 newRecord.setCreateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.insertSixCheckRecord(newRecord);
             } else {
                 // 已有记录，追加内容
                 SixCheckRecord exist = records.get(0);
-                String oldValue = exist.getRecordValue();
-                if (StringUtils.isBlank(oldValue) || "正常".equals(oldValue)) {
-                    // 如果原内容为空或为“正常”，则直接设置为扣分信息
-                    exist.setRecordValue(deductInfo);
+                String oldValue = exist.getRecordValue(); // 数据库中的旧值
+
+                // 关键：如果前端传了当前输入框内容，则以输入框内容为基础；否则以数据库旧值为基础
+                String baseValue = StringUtils.isNotBlank(dto.getCurrentRecordValue())
+                        ? dto.getCurrentRecordValue()
+                        : oldValue;
+
+                // 根据 baseValue 决定是追加还是替换
+                if (StringUtils.isNotBlank(baseValue) && !"正常".equals(baseValue)) {
+                    exist.setRecordValue(baseValue + "\n" + deductInfo);
                 } else {
-                    // 否则在原有内容末尾换行追加
-                    exist.setRecordValue(oldValue + "\n" + deductInfo);
+                    exist.setRecordValue(deductInfo);
                 }
                 exist.setUpdateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.updateSixCheckRecord(exist);
+
+                // 返回最终内容，供前端回显
+                // result.put("finalValue", exist.getRecordValue());
             }
         }
         return success("加扣分成功！");

@@ -176,7 +176,8 @@
             window._currentDeductInfo = {
                 sixCheckItemId: sixCheckItemId,
                 checkDate: $("#checkDate").val(),
-                shift: $("#shift").val()
+                shift: $("#shift").val(),
+                currentValue: currentValue = $("#tableBody textarea[data-item-id='" + sixCheckItemId + "']").val() || '正常'
             };
 
             // 同时加载用户和考核项目
@@ -243,14 +244,18 @@
                                 remark: remark,
                                 sixCheckItemId: window._currentDeductInfo ? window._currentDeductInfo.sixCheckItemId : null,
                                 checkDate: window._currentDeductInfo ? window._currentDeductInfo.checkDate : null,
-                                shift: window._currentDeductInfo ? window._currentDeductInfo.shift : null
+                                shift: window._currentDeductInfo ? window._currentDeductInfo.shift : null,
+                                currentRecordValue: window._currentDeductInfo.currentValue
                             }),
                             success: function (res) {
                                 if (res.code == 0) {
                                     alert("加扣分成功！");
                                     layer.close(index);
-                                    if (typeof loadData === 'function') {
-                                        loadData();
+                                    if (res.data && res.data.finalValue) {
+                                        var textarea = $('textarea[data-item-id="' + window._currentDeductInfo.sixCheckItemId + '"]');
+                                        if (textarea.length > 0) {
+                                            textarea.val(res.data.finalValue);
+                                        }
                                     }
                                 } else {
                                     alert("操作失败：" + res.msg);
