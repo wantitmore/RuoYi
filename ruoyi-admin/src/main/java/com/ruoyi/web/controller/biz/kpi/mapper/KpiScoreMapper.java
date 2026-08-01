@@ -65,4 +65,9 @@ public interface KpiScoreMapper {
      * @return 结果
      */
     public int deleteKpiScoreByIds(String[] ids);
+
+    void deleteByUserAndRemark(@Param("userName") String userName,
+                           @Param("remark") String remark,
+                           @Param("checkDate") String checkDate,
+                           @Param("deptId") Long deptId);
 }

@@ -116,12 +116,44 @@
                     if (canEdit) {
                         html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', \'' + (dutyLeader || '') + '\', \'' + item.id + '\')"><i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
                     }
+                    // 检查当前输入框内容是否包含扣分信息
+                    var deductPattern = /（关联加扣分-[^）]+）/g;
+                    var deductMatches = recordValue.match(deductPattern);
+                    if (deductMatches && deductMatches.length > 0) {
+                        var lastDeduct = deductMatches[deductMatches.length - 1]; // 取最后一条扣分信息
+                        html += '<td><button class="btn btn-xs btn-danger" ' +
+                            'onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\')" ' +
+                            'title="撤销最后一条关联扣分"><i class="fa fa-undo"></i></button></td>';
+                    }
                     html += '</tr>';
                 }
                 $("#tableBody").html(html);
                 $("#tableWrapper").show();
                 if (canEdit) {
                     $("#saveBtn").show();
+                }
+            });
+        }
+        function cancelDeduct(itemId, deductInfo) {
+            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) return;
+
+            $.ajax({
+                url: ctx + "sixcheck/record/cancelDeduct",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    itemId: itemId,
+                    checkDate: $("#checkDate").val(),
+                    shift: $("#shift").val(),
+                    deductInfo: deductInfo
+                }),
+                success: function (res) {
+                    if (res.code == 0) {
+                        alert("撤销成功");
+                        loadData(); // 刷新表格
+                    } else {
+                        alert("操作失败：" + res.msg);
+                    }
                 }
             });
         }

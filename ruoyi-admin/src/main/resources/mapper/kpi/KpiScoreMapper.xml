@@ -115,4 +115,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
+   <delete id="deleteByUserAndRemark">
+        DELETE FROM kpi_score
+    WHERE user_id = (SELECT user_id FROM sys_user WHERE user_name = #{userName})
+      AND remark = #{remark}
+      AND batch_no = DATE_FORMAT(#{checkDate}, '%Y-%m')
+      AND item_id IN (
+          SELECT id FROM kpi_item WHERE dept_id = #{deptId}
+      )
+    LIMIT 1
+</delete>
+
 </mapper>

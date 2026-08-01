@@ -63,4 +63,6 @@ public interface IKpiScoreService
      * @return 结果
      */
     public int deleteKpiScoreById(Long id);
+
+    void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId);
 }

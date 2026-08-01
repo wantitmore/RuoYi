@@ -6,6 +6,8 @@ import java.util.Map;
 import com.ruoyi.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.ruoyi.web.controller.biz.kpi.mapper.KpiScoreMapper;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
 import com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary;
@@ -94,5 +96,10 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
     @Override
     public int deleteKpiScoreById(Long id) {
         return kpiScoreMapper.deleteKpiScoreById(id);
+    }
+
+   @Override
+public void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId) {
+    kpiScoreMapper.deleteByUserAndRemark(userName, remark, checkDate, deptId);
     }
 }
