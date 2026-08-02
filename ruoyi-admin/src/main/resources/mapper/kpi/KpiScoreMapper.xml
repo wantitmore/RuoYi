@@ -17,30 +17,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateTime"    column="update_time"    />
     </resultMap>
 
-    <select id="selectSummary" resultType="com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary">
-        SELECT 
-            u.user_id AS userId,
-            u.user_name AS userName,
-            d.dept_name AS deptName,
-            p.post_name AS postName,
-            SUM(s.score) AS totalScore,
-            COUNT(s.id) AS itemCount
-        FROM kpi_score s
-        JOIN sys_user u ON u.user_id = s.user_id
-        JOIN sys_dept d ON u.dept_id = d.dept_id
-        LEFT JOIN sys_user_post up ON u.user_id = up.user_id
-        LEFT JOIN sys_post p ON up.post_id = p.post_id
-        WHERE s.batch_no = #{batchNo}
-        <if test="deptId != null">
-            AND u.dept_id = #{deptId}
-        </if>
-        <if test="postId != null">
-            AND up.post_id = #{postId}
-        </if>
-        GROUP BY u.user_id, u.user_name, d.dept_name, p.post_name
-        ORDER BY totalScore DESC
-    </select>
-
     <sql id="selectKpiScoreVo">
         select id, user_id, item_id, score, batch_no, remark, create_by, create_time, update_by, update_time 
         from kpi_score
@@ -62,44 +38,82 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </select>
 
+    <select id="selectAvgSummary" resultType="com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary">
+            SELECT 
+            u.user_id AS userId,
+            u.user_name AS userName,
+            d.dept_name AS deptName,
+            p.post_name AS postName,
+            ROUND(100 + SUM(s.score) / COUNT(DISTINCT s.batch_no), 2) AS totalScore,
+            COUNT(DISTINCT s.batch_no) AS itemCount
+        FROM kpi_score s
+        JOIN sys_user u ON u.user_id = s.user_id
+        JOIN sys_dept d ON u.dept_id = d.dept_id
+        LEFT JOIN sys_user_post up ON u.user_id = up.user_id
+        LEFT JOIN sys_post p ON up.post_id = p.post_id
+        WHERE s.batch_no IN
+        <foreach collection="months" item="m" open="(" separator="," close=")">
+            #{m}
+        </foreach>
+        <if test="deptId != null">
+            AND u.dept_id = #{deptId}
+        </if>
+        <if test="postId != null">
+            AND up.post_id = #{postId}
+        </if>
+        GROUP BY u.user_id, u.user_name, d.dept_name, p.post_name
+        HAVING COUNT(DISTINCT s.batch_no) > 0
+        ORDER BY totalScore DESC
+    </select>
+
+    <select id="selectByMonths" resultMap="KpiScoreResult">
+        SELECT * FROM kpi_score
+        WHERE user_id = #{userId}
+        AND batch_no IN
+        <foreach collection="months" item="m" open="(" separator="," close=")">
+            #{m}
+        </foreach>
+        ORDER BY batch_no, id
+    </select>
+
     <insert id="insertKpiScore" parameterType="KpiScore" useGeneratedKeys="true" keyProperty="id">
-        insert into kpi_score
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="userId != null">user_id,</if>
-            <if test="itemId != null">item_id,</if>
-            <if test="score != null">score,</if>
-            <if test="batchNo != null">batch_no,</if>
-            <if test="createBy != null">create_by,</if>
-            <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
-            <if test="remark != null">remark,</if>
-         </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="userId != null">#{userId},</if>
-            <if test="itemId != null">#{itemId},</if>
-            <if test="score != null">#{score},</if>
-            <if test="batchNo != null">#{batchNo},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-            <if test="remark != null">#{remark},</if>
-         </trim>
-    </insert>
+    insert into kpi_score
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+        <if test="userId != null">user_id,</if>
+        <if test="itemId != null">item_id,</if>
+        <if test="score != null">score,</if>
+        <if test="batchNo != null">batch_no,</if>
+        <if test="createBy != null">create_by,</if>
+        <if test="createTime != null">create_time,</if>
+        <if test="updateBy != null">update_by,</if>
+        <if test="updateTime != null">update_time,</if>
+        <if test="remark != null">remark,</if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+        <if test="userId != null">#{userId},</if>
+        <if test="itemId != null">#{itemId},</if>
+        <if test="score != null">#{score, jdbcType=DECIMAL},</if>   <!-- 顺序调整到这里 -->
+        <if test="batchNo != null">#{batchNo},</if>
+        <if test="createBy != null">#{createBy},</if>
+        <if test="createTime != null">#{createTime},</if>
+        <if test="updateBy != null">#{updateBy},</if>
+        <if test="updateTime != null">#{updateTime},</if>
+        <if test="remark != null">#{remark, jdbcType=VARCHAR},</if>
+    </trim>
+</insert>
 
     <update id="updateKpiScore" parameterType="KpiScore">
         update kpi_score
         <trim prefix="SET" suffixOverrides=",">
             <if test="userId != null">user_id = #{userId},</if>
             <if test="itemId != null">item_id = #{itemId},</if>
-            <if test="score != null">score = #{score},</if>
+            <if test="score != null">score = #{score, jdbcType=DECIMAL},</if>
+            <if test="remark != null">remark = #{remark, jdbcType=VARCHAR},</if>
             <if test="batchNo != null">batch_no = #{batchNo},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
-            <if test="remark != null">remark = #{remark},</if>
         </trim>
         where id = #{id}
     </update>

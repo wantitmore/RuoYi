@@ -65,4 +65,9 @@ public interface IKpiScoreService
     public int deleteKpiScoreById(Long id);
 
     void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId);
+
+     List<ScoreSummary> selectAvgSummary(List<String> months, Long deptId,
+                    Long batchNo);
+
+    List<KpiScore> selectByMonths(Long userId, List<String> months);
 }

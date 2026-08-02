@@ -3,6 +3,7 @@ package com.ruoyi.web.controller.biz.kpi.controller;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -218,25 +219,42 @@ public class KpiScoreController extends BaseController {
     @PostMapping("/saveBatch")
     @ResponseBody
     public AjaxResult saveBatch(@RequestBody List<KpiScore> scoreList) {
+        System.out.println("=== 完整 scoreList: " + scoreList.toString());
         for (KpiScore score : scoreList) {
-            // 检查是否存在相同 user_id + item_id + batch_no 的记录
-            KpiScore exist = new KpiScore();
-            exist.setUserId(score.getUserId());
-            exist.setItemId(score.getItemId());
-            exist.setBatchNo(score.getBatchNo());
-            List<KpiScore> existingList = kpiScoreService.selectKpiScoreList(exist);
-            if (existingList.size() > 0) {
-                // 更新
-                KpiScore updateScore = existingList.get(0);
-                updateScore.setScore(score.getScore());
-                updateScore.setUpdateBy(ShiroUtils.getLoginName());
-                updateScore.setRemark(score.getRemark());
-                kpiScoreService.updateKpiScore(updateScore);
+            System.out.println("=== 收到数据: userId=" + score.getUserId() + 
+                   ", itemId=" + score.getItemId() + 
+                   ", score=[" + score.getScore() + "]" + 
+                   ", batchNo=[" + score.getBatchNo() + "]" +
+                   ", remark=[" + score.getRemark() + "]");
+            // 查询是否已有记录
+            KpiScore query = new KpiScore();
+            query.setUserId(score.getUserId());
+            query.setItemId(score.getItemId());
+            query.setBatchNo(score.getBatchNo());
+            List<KpiScore> existList = kpiScoreService.selectKpiScoreList(query);
+
+            if (existList.size() > 0) {
+                // 已有记录
+                KpiScore exist = existList.get(0);
+                if (score.getScore() == null) {
+                    // 用户清空了分数 → 删除已有记录
+                    kpiScoreService.deleteKpiScoreByIds(exist.getId().toString());
+                } else {
+                    // 有分数（含0） → 更新
+                    exist.setScore(score.getScore());
+                    exist.setRemark(score.getRemark()); // 备注也同步更新
+                    exist.setUpdateBy(ShiroUtils.getLoginName());
+                    kpiScoreService.updateKpiScore(exist);
+                }
             } else {
-                // 插入
-                score.setCreateBy(ShiroUtils.getLoginName());
-                score.setRemark(score.getRemark());
-                kpiScoreService.insertKpiScore(score);
+                // 无记录
+                if (score.getScore() != null) {
+                    // 有分数（含0） → 插入
+                    score.setCreateBy(ShiroUtils.getLoginName());
+                    score.setRemark(score.getRemark()); // 保证备注入库
+                    kpiScoreService.insertKpiScore(score);
+                }
+                // 无记录且分数为null → 什么都不做
             }
         }
         return success("保存成功");
@@ -326,14 +344,18 @@ public class KpiScoreController extends BaseController {
 
     @GetMapping("/personDetail")
     @ResponseBody
-    public AjaxResult personDetail(@RequestParam String batchNo, @RequestParam Long userId) {
-        // 查询该用户、该批次的所有打分记录
-        KpiScore query = new KpiScore();
-        query.setBatchNo(batchNo);
-        query.setUserId(userId);
-        List<KpiScore> list = kpiScoreService.selectKpiScoreList(query);
+    public AjaxResult personDetail(@RequestParam String startMonth,
+            @RequestParam String endMonth,
+            @RequestParam Long userId) {
+        // 生成区间月份列表
+        List<String> months = getMonthsBetween(startMonth, endMonth);
+        if (months.isEmpty()) {
+            return error("月份区间无效");
+        }
 
-        // 组装详情数据：需要考核项目名称
+        // 查询该用户在区间内所有考核记录
+        List<KpiScore> list = kpiScoreService.selectByMonths(userId, months);
+
         List<Map<String, Object>> details = new ArrayList<>();
         for (KpiScore score : list) {
             Map<String, Object> item = new HashMap<>();
@@ -341,6 +363,7 @@ public class KpiScoreController extends BaseController {
             item.put("itemName", kpiItem != null ? kpiItem.getName() : "未知项目");
             item.put("score", score.getScore());
             item.put("remark", score.getRemark() != null ? score.getRemark() : "");
+            item.put("batchNo", score.getBatchNo());
             details.add(item);
         }
         return success().put("data", details);
@@ -457,8 +480,53 @@ public class KpiScoreController extends BaseController {
         List<ScoreSummary> list = kpiScoreService.selectSummary(batchNo, deptId, postId);
         for (int i = 0; i < list.size(); i++) {
             list.get(i).setRank(i + 1);
+            list.get(i).setTotalScore(list.get(i).getTotalScore() + 100);
         }
         ExcelUtil<ScoreSummary> util = new ExcelUtil<>(ScoreSummary.class);
         util.exportExcel(response, list, "考核结果_" + batchNo);
+    }
+
+    @GetMapping("/summary/avg")
+    @ResponseBody
+    public AjaxResult avgSummary(@RequestParam String startMonth,
+            @RequestParam String endMonth,
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) Long postId) {
+        if (!ShiroUtils.getSysUser().isAdmin()) {
+            deptId = ShiroUtils.getSysUser().getDeptId();
+        }
+
+        // 生成区间月份列表
+        List<String> months = getMonthsBetween(startMonth, endMonth);
+        if (months.isEmpty()) {
+            return error("开始月份不能大于结束月份");
+        }
+
+        List<ScoreSummary> list = kpiScoreService.selectAvgSummary(months, deptId, postId);
+        for (int i = 0; i < list.size(); i++) {
+            list.get(i).setRank(i + 1);
+            // totalScore 存储的是平均分，保留两位小数
+            list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
+        }
+        return success().put("data", list);
+    }
+
+    // 辅助方法：生成区间月份列表
+    private List<String> getMonthsBetween(String start, String end) {
+        List<String> months = new ArrayList<>();
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(sdf.parse(start));
+            Date endDate = sdf.parse(end);
+
+            while (!cal.getTime().after(endDate)) {
+                months.add(sdf.format(cal.getTime()));
+                cal.add(Calendar.MONTH, 1);
+            }
+        } catch (ParseException e) {
+            // 格式错误
+        }
+        return months;
     }
 }

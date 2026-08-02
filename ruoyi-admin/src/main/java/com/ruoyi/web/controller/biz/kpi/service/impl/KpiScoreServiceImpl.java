@@ -98,8 +98,21 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
         return kpiScoreMapper.deleteKpiScoreById(id);
     }
 
-   @Override
-public void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId) {
-    kpiScoreMapper.deleteByUserAndRemark(userName, remark, checkDate, deptId);
+    @Override
+    public void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId) {
+        kpiScoreMapper.deleteByUserAndRemark(userName, remark, checkDate, deptId);
+    }
+
+    @Override
+    public  List<ScoreSummary>  selectAvgSummary(List<String> months, Long deptId, Long postId) {
+        if (months != null && !months.isEmpty()) {
+            return kpiScoreMapper.selectAvgSummary(months, deptId, postId);
+        }
+        return null;
+    }
+
+    @Override
+    public List<KpiScore> selectByMonths(Long userId, List<String> months) {
+        return kpiScoreMapper.selectByMonths( months, userId);
     }
 }
