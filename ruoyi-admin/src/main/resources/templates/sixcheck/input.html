@@ -84,7 +84,7 @@
             });
         });
 
-        function loadData() {
+        function loadData(lastKpiScoreId) {
             var checkDate = $("#checkDate").val();
             var shift = $("#shift").val();
             if (!checkDate || !shift) { alert("请选择值班日期和班次"); return; }
@@ -96,7 +96,6 @@
                 if (dutyLeader) {
                     $("#dutyLeader").val(dutyLeader);
                 } else {
-                    // 没有历史数据时，重置为默认值（当前登录用户名）
                     $("#dutyLeader").val($("#dutyLeader").attr("data-default") || "");
                 }
                 var html = '';
@@ -104,7 +103,6 @@
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     var recordValue = records[item.id] || '';
-                    // 如果为空或空白，默认显示“正常”
                     if (recordValue.trim() === '') {
                         recordValue = '正常';
                     }
@@ -112,21 +110,25 @@
                     html += '<td style="width: 30px;">' + (i + 1) + '</td>';
                     html += '<td style="width: 20%;">' + item.name + '</td>';
                     html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3">' + recordValue + '</textarea></td>';
-                    // 如果当前用户有扣分权限，显示按钮
+
+                    // 关联扣分按钮
                     if (canEdit) {
                         html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', \'' + (dutyLeader || '') + '\', \'' + item.id + '\')"><i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
                     }
-                    // 检查当前输入框内容是否包含扣分信息
+
+                    // 撤销按钮
                     var deductPattern = /（关联加扣分-[^）]+）/g;
                     var deductMatches = recordValue.match(deductPattern);
                     if (deductMatches && deductMatches.length > 0) {
-                        var lastDeduct = deductMatches[deductMatches.length - 1]; // 取最后一条扣分信息
-                        html += '<td><button class="btn btn-xs btn-danger" ' +
-                            'onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\')" ' +
-                            'title="撤销最后一条关联扣分"><i class="fa fa-undo"></i></button></td>';
+                        var lastDeduct = deductMatches[deductMatches.length - 1];  // ★ 定义 lastDeduct
+                        var kpiItemIdToDelete = window._lastDeductKpiItemId || '';
+                        console.log("撤销扣分按钮：lastDeduct=" + lastDeduct + ", kpiItemIdToDelete=" + kpiItemIdToDelete + ", lastKpiScoreId=" + lastKpiScoreId);
+                        var scoreIdToDelete = lastKpiScoreId || '';
+                        html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\', \'' + scoreIdToDelete + '\', \'' + kpiItemIdToDelete + '\')">撤销</button></td>';
                     }
                     html += '</tr>';
                 }
+                // ★ 将表格渲染移到循环外部
                 $("#tableBody").html(html);
                 $("#tableWrapper").show();
                 if (canEdit) {
@@ -134,25 +136,34 @@
                 }
             });
         }
-        function cancelDeduct(itemId, deductInfo) {
-            console.log('撤销的 itemId:', itemId);
-    console.log('撤销的 deductInfo:', deductInfo);
+        function cancelDeduct(itemId, deductInfo, kpiScoreId, kpiItemId) {
+            var requestData = {
+                itemId: itemId,
+                checkDate: $("#checkDate").val(),
+                shift: $("#shift").val(),
+                deductInfo: deductInfo,
+                kpiScoreId: kpiScoreId,
+                kpiItemId: kpiItemId || null
+            };
+            if (kpiScoreId) requestData.kpiScoreId = kpiScoreId;
+            if (kpiItemId) requestData.kpiItemId = kpiItemId;
             if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) return;
+
+            console.log("撤销扣分请求数据:kpiScoreId", requestData.kpiScoreId);
+            // 如果有精确的 kpi_score ID，就传过去；否则后端用文本匹配降级
+            if (kpiScoreId) {
+                requestData.kpiScoreId = kpiScoreId;
+            }
 
             $.ajax({
                 url: ctx + "sixcheck/record/cancelDeduct",
                 type: "POST",
                 contentType: "application/json",
-                data: JSON.stringify({
-                    itemId: itemId,
-                    checkDate: $("#checkDate").val(),
-                    shift: $("#shift").val(),
-                    deductInfo: deductInfo
-                }),
+                data: JSON.stringify(requestData),
                 success: function (res) {
                     if (res.code == 0) {
                         alert("撤销成功");
-                        loadData(); // 刷新表格
+                        loadData(); // 刷新表格（不带 ID）
                     } else {
                         alert("操作失败：" + res.msg);
                     }
@@ -282,6 +293,7 @@
                                 currentRecordValue: window._currentDeductInfo.currentValue
                             }),
                             success: function (res) {
+                                console.log('完整响应:', res);
                                 if (res.code == 0) {
                                     alert("加扣分成功！");
                                     layer.close(index);
@@ -291,6 +303,10 @@
                                             textarea.val(res.data.finalValue);
                                         }
                                     }
+                                    var kpiScoreId = res.data ? res.data.kpiScoreId : res.kpiScoreId;;
+                                    //window._lastDeductKpiItemId = kpiItemId; // 在 yes 回调中设置
+                                    console.log("加扣分成功，kpiScoreId=" + kpiScoreId + ", res.kpiScoreId = " +  res.kpiScoreId);
+                                    loadData(kpiScoreId);
                                 } else {
                                     alert("操作失败：" + res.msg);
                                 }

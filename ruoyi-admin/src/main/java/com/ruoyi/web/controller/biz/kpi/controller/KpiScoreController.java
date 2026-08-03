@@ -383,88 +383,72 @@ public class KpiScoreController extends BaseController {
     @PostMapping("/quickDeduct")
     @ResponseBody
     public AjaxResult quickDeduct(@RequestBody QuickDeductDTO dto) {
-
-        // 1. 直接使用前端传来的考核项目ID（不再转换）
-        Long kpiItemId = dto.getItemId();
-        if (kpiItemId == null)
-            return error("未选择考核项目");
+        // 1. 参数校验
+        if (dto.getUserId() == null || dto.getItemId() == null || dto.getScore() == null) {
+            return error("缺少必填参数");
+        }
 
         // 2. 查询已有记录
+        String batchNo = new SimpleDateFormat("yyyy-MM").format(new Date());
         KpiScore existQuery = new KpiScore();
         existQuery.setUserId(dto.getUserId());
-        existQuery.setItemId(kpiItemId);
-        existQuery.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+        existQuery.setItemId(dto.getItemId());
+        existQuery.setBatchNo(batchNo);
         List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
 
-        // 3. 生成带分数的扣分描述（BigDecimal 格式化为一位小数）
-        String userName = "";
+        // 3. 生成扣分描述（用于六必查和备注）
+        String userName = dto.getUserId().toString(); // 默认，下面会从数据库查
         SysUser user = userService.selectUserById(dto.getUserId());
         if (user != null)
             userName = user.getUserName();
-        BigDecimal newScore = dto.getScore() != null ? dto.getScore() : BigDecimal.ZERO;
-        String deductInfo = String.format("（关联加扣分-%s-%s分-%s）",
-                userName, newScore.setScale(1, RoundingMode.HALF_UP).toString(), dto.getRemark());
+        String deductInfo = String.format("（关联加扣分-%s-%.1f分-%s）",
+                userName, dto.getScore().doubleValue(), dto.getRemark());
 
+        Long finalScoreId; // 最终返回给前端的 kpi_score ID
 
         if (existList.size() > 0) {
-            // 已有记录：分数累加，备注拼接（换行）
+            // 已有记录：累加分数，备注换行追加
             KpiScore exist = existList.get(0);
-            BigDecimal oldScore = exist.getScore() != null ? exist.getScore() : BigDecimal.ZERO;
-            exist.setScore(oldScore.add(newScore));
-
+            exist.setScore(exist.getScore().add(dto.getScore()));
             String oldRemark = exist.getRemark() != null ? exist.getRemark() : "";
-            String newRemark = oldRemark.isEmpty() ? deductInfo : (oldRemark + "\n" + deductInfo);
-            exist.setRemark(newRemark);
+            exist.setRemark(oldRemark.isEmpty() ? deductInfo : oldRemark + "\n" + deductInfo);
             exist.setUpdateBy(ShiroUtils.getLoginName());
             kpiScoreService.updateKpiScore(exist);
+            finalScoreId = exist.getId(); // 返回已有记录的ID
         } else {
-            // 无记录：插入新记录
+            // 新记录
             KpiScore score = new KpiScore();
             score.setUserId(dto.getUserId());
-            score.setItemId(kpiItemId);
-            score.setScore(newScore);
-            score.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+            score.setItemId(dto.getItemId());
+            score.setScore(dto.getScore());
+            score.setBatchNo(batchNo);
             score.setRemark(deductInfo);
             score.setCreateBy(ShiroUtils.getLoginName());
             kpiScoreService.insertKpiScore(score);
+            finalScoreId = score.getId();
         }
 
+        // 4. 更新六必查记录（保持原有逻辑）
         if (dto.getSixCheckItemId() != null && StringUtils.isNotBlank(dto.getCheckDate())
                 && StringUtils.isNotBlank(dto.getShift())) {
-            // 查询六必查记录
             SixCheckRecord query = new SixCheckRecord();
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             query.setItemId(dto.getSixCheckItemId());
             try {
-                query.setCheckDate(sdf.parse(dto.getCheckDate()));
+                query.setCheckDate(new SimpleDateFormat("yyyy-MM-dd").parse(dto.getCheckDate()));
             } catch (ParseException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             query.setShift(dto.getShift());
             query.setDeptId(ShiroUtils.getSysUser().getDeptId());
             List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
 
-            // 获取被考核人姓名
-            if (user != null)
-                userName = user.getUserName();
-
-            // 构建扣分描述信息
-            
             if (records.isEmpty()) {
                 SixCheckRecord newRecord = new SixCheckRecord();
-                // ... 设置 itemId, checkDate, shift, deptId 等
-                newRecord.setItemId(dto.getSixCheckItemId()); // ★ 这一行必须存在
-                try {
-                    newRecord.setCheckDate(sdf.parse(dto.getCheckDate()));
-                } catch (ParseException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                newRecord.setItemId(dto.getSixCheckItemId());
+                newRecord.setCheckDate(query.getCheckDate());
                 newRecord.setShift(dto.getShift());
                 newRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
                 newRecord.setDutyLeader(ShiroUtils.getSysUser().getUserName());
-                // 以输入框内容为基础（如果有），否则基础为空
                 String baseValue = StringUtils.defaultString(dto.getCurrentRecordValue(), "");
                 if (StringUtils.isNotBlank(baseValue) && !"正常".equals(baseValue)) {
                     newRecord.setRecordValue(baseValue + "\n" + deductInfo);
@@ -474,16 +458,11 @@ public class KpiScoreController extends BaseController {
                 newRecord.setCreateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.insertSixCheckRecord(newRecord);
             } else {
-                // 已有记录，追加内容
                 SixCheckRecord exist = records.get(0);
-                String oldValue = exist.getRecordValue(); // 数据库中的旧值
-
-                // 关键：如果前端传了当前输入框内容，则以输入框内容为基础；否则以数据库旧值为基础
+                String oldValue = exist.getRecordValue();
                 String baseValue = StringUtils.isNotBlank(dto.getCurrentRecordValue())
                         ? dto.getCurrentRecordValue()
                         : oldValue;
-
-                // 根据 baseValue 决定是追加还是替换
                 if (StringUtils.isNotBlank(baseValue) && !"正常".equals(baseValue)) {
                     exist.setRecordValue(baseValue + "\n" + deductInfo);
                 } else {
@@ -491,12 +470,10 @@ public class KpiScoreController extends BaseController {
                 }
                 exist.setUpdateBy(ShiroUtils.getLoginName());
                 sixCheckRecordService.updateSixCheckRecord(exist);
-
-                // 返回最终内容，供前端回显
-                // result.put("finalValue", exist.getRecordValue());
             }
         }
-        return success("加扣分成功！");
+
+        return success("加扣分成功！").put("kpiScoreId", finalScoreId);
     }
 
     @RequiresPermissions("kpi:score:summary")
