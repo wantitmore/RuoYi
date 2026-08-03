@@ -45,6 +45,7 @@ import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.ShiroUtils;
 
@@ -70,6 +71,9 @@ public class SixCheckRecordController extends BaseController {
 
     @Autowired
     private IKpiItemService kpiItemService; // 注入考核项目Service
+    @Autowired
+private ISysUserService userService;
+
 
     @GetMapping("/input")
     public String input(ModelMap mmap) {
@@ -308,84 +312,102 @@ public class SixCheckRecordController extends BaseController {
      * 撤销关联扣分：清除六必查记录中的扣分描述，并删除考核打分中的扣分记录
      */
     @RequiresPermissions("sixcheck:record:edit")
-    @PostMapping("/cancelDeduct")
-    @ResponseBody
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
-        Long itemId = Long.valueOf(params.get("itemId").toString()); // 六必查检查项ID（注意：不是考核项目ID）
-        System.out.println("六必查cancelDeduct params: " + itemId);
-        String checkDate = params.get("checkDate").toString();
-        String shift = params.get("shift").toString();
-        String deductInfo = params.get("deductInfo").toString();
-        Long deptId = ShiroUtils.getSysUser().getDeptId();
+@PostMapping("/cancelDeduct")
+@ResponseBody
+@Transactional(rollbackFor = Exception.class)
+public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
+    Long itemId = Long.valueOf(params.get("itemId").toString());
+    String checkDate = params.get("checkDate").toString();
+    String shift = params.get("shift").toString();
+    String deductInfo = params.get("deductInfo").toString();
+    Long deptId = ShiroUtils.getSysUser().getDeptId();
 
-        // 1. 更新六必查文字（保持不变）
-        SixCheckRecord query = new SixCheckRecord();
-        query.setItemId(itemId);
-        query.setCheckDate(DateUtils.parseDate(checkDate));
-        query.setShift(shift);
-        query.setDeptId(deptId);
-        List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
-        if (!records.isEmpty()) {
-            SixCheckRecord exist = records.get(0);
-            String oldValue = exist.getRecordValue();
-            if (oldValue != null && oldValue.contains(deductInfo)) {
-                String newValue = oldValue.replace("\n" + deductInfo, "").replace(deductInfo, "");
-                exist.setRecordValue(newValue.trim().isEmpty() ? "正常" : newValue.trim());
-                exist.setUpdateBy(ShiroUtils.getLoginName());
-                sixCheckRecordService.updateSixCheckRecord(exist);
+    // ========== 1. 更新六必查记录（移除扣分描述） ==========
+    SixCheckRecord query = new SixCheckRecord();
+    query.setItemId(itemId);
+    query.setCheckDate(DateUtils.parseDate(checkDate));
+    query.setShift(shift);
+    query.setDeptId(deptId);
+    List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
+
+    if (!records.isEmpty()) {
+        SixCheckRecord exist = records.get(0);
+        String oldValue = exist.getRecordValue();
+        if (oldValue != null && oldValue.contains(deductInfo)) {
+            String newValue = oldValue.replace("\n" + deductInfo, "").replace(deductInfo, "");
+            if (newValue.trim().isEmpty()) {
+                newValue = "正常";
             }
+            exist.setRecordValue(newValue);
+            exist.setUpdateBy(ShiroUtils.getLoginName());
+            sixCheckRecordService.updateSixCheckRecord(exist);
         }
-
-        // 2. 删除考核打分记录
-        // 策略1：精确ID删除
-        Object kpiScoreIdObj = params.get("kpiScoreId");
-        System.out.println("六必查cancelDeduct kpiScoreIdObj: " + kpiScoreIdObj);
-        if (kpiScoreIdObj != null && StringUtils.isNotBlank(kpiScoreIdObj.toString())) {
-            Long kpiScoreId = Long.valueOf(kpiScoreIdObj.toString());
-            int rows = kpiScoreService.deleteKpiScoreByIds(kpiScoreId.toString());
-            System.out.println("撤销关联扣分：尝试删除考核打分记录，ID=" + kpiScoreId + "，删除行数=" + rows);
-            if (rows > 0) {
-            System.out.println("撤销关联扣分：已删除考核打分记录，ID=" + kpiScoreId);
-                return success("撤销成功");
-            }
-        }
-
-        // 策略2：按 userId + 考核项目ID + 月份 查找，匹配扣分描述（正则）
-        Long userId = ShiroUtils.getUserId();
-        String batchNo = DateUtils.parseDateToStr("yyyy-MM", DateUtils.parseDate(checkDate));
-        // 从 deductInfo 中尝试提取考核项目ID（如果前端传了 kpiItemId 更好，但当前先不依赖）
-        // 这里可以直接用 itemId 吗？注意：itemId 是六必查的检查项ID，并不是 kpi_score 里的 item_id。
-        // 我们需要的是 kpi_score 的 item_id，即考核项目ID。前端在 openDeductModal 中保存了 kpiItemId，应传递过来。
-        Long kpiItemId = params.get("kpiItemId") != null ? Long.valueOf(params.get("kpiItemId").toString()) : null;
-        if (kpiItemId == null) {
-            // 如果没有 kpiItemId，尝试从备注里解析（不推荐，但可作为备用）
-            // 省略...
-            return error("无法确定考核项目ID");
-        }
-
-        KpiScore existQuery = new KpiScore();
-        existQuery.setUserId(userId);
-        existQuery.setItemId(kpiItemId);
-        existQuery.setBatchNo(batchNo);
-        List<KpiScore> scoreList = kpiScoreService.selectKpiScoreList(existQuery);
-        // 按创建时间倒序，删除最新一条匹配备注的记录
-        scoreList.sort((a, b) -> b.getCreateTime().compareTo(a.getCreateTime()));
-        for (KpiScore s : scoreList) {
-            if (s.getRemark() != null && s.getRemark().contains(deductInfo)) {
-                kpiScoreService.deleteKpiScoreByIds(s.getId().toString());
-                return success("撤销成功");
-            }
-        }
-
-        // 策略3：兜底关键词匹配（适用于扣分描述格式变化）
-        for (KpiScore s : scoreList) {
-            if (s.getRemark() != null && s.getRemark().contains("关联加扣分")) {
-                kpiScoreService.deleteKpiScoreByIds(s.getId().toString());
-                return success("撤销成功");
-            }
-        }
-
-        return error("未找到对应的考核打分记录，撤销失败");
     }
+
+    // ========== 2. 解析扣分描述，获取用户名、分数、备注 ==========
+    String userName = null;
+    BigDecimal deductScore = BigDecimal.ZERO;
+    String remark = null;
+
+    // 匹配格式：（关联加扣分-用户名-分数-备注）
+    java.util.regex.Pattern p1 = java.util.regex.Pattern.compile("（关联加扣分-(.+?)-(\\d+\\.?\\d*)分-(.+)）");
+    java.util.regex.Matcher m1 = p1.matcher(deductInfo);
+    if (m1.find()) {
+        userName = m1.group(1).trim();
+        deductScore = new BigDecimal(m1.group(2));
+        remark = m1.group(3).trim();
+    } else {
+        // 匹配格式：（关联加扣分-用户名-备注） 无分数
+        java.util.regex.Pattern p2 = java.util.regex.Pattern.compile("（关联加扣分-(.+?)-(.+)）");
+        java.util.regex.Matcher m2 = p2.matcher(deductInfo);
+        if (m2.find()) {
+            userName = m2.group(1).trim();
+            remark = m2.group(2).trim();
+        }
+    }
+
+    if (userName == null) {
+        return error("扣分描述格式错误，无法解析");
+    }
+
+    // ========== 3. 更新考核打分记录 ==========
+    // 根据用户名查找用户
+    SysUser queryUser = new SysUser();
+    queryUser.setUserName(userName);
+    List<SysUser> userList = userService.selectUserList(queryUser);
+    if (userList.isEmpty()) {
+        return error("用户不存在：" + userName);
+    }
+    Long userId = userList.get(0).getUserId();
+
+    // 生成月份字符串（YYYY-MM）
+    String batchNo = DateUtils.parseDateToStr("yyyy-MM", DateUtils.parseDate(checkDate));
+
+    // 查询该用户、该月份、该部门的考核记录
+    KpiScore scoreQuery = new KpiScore();
+    scoreQuery.setUserId(userId);
+    scoreQuery.setBatchNo(batchNo);
+    List<KpiScore> scoreList = kpiScoreService.selectKpiScoreList(scoreQuery);
+
+    // 找到备注中包含该扣分描述的那条记录
+    for (KpiScore score : scoreList) {
+        if (score.getRemark() != null && score.getRemark().contains(deductInfo)) {
+            // 扣掉分数（deductScore 是扣分，为负数，加上它就是扣减）
+            if (score.getScore() != null) {
+                score.setScore(score.getScore().add(deductScore));
+            }
+            // 从备注中移除扣分描述
+            String newRemark = score.getRemark().replace(deductInfo, "").trim();
+            if (newRemark.isEmpty()) {
+                newRemark = null;
+            }
+            score.setRemark(newRemark);
+            score.setUpdateBy(ShiroUtils.getLoginName());
+            kpiScoreService.updateKpiScore(score);
+            break;
+        }
+    }
+
+    return success("撤销成功");
+}
 }
