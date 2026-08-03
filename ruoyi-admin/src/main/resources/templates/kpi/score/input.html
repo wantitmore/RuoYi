@@ -322,21 +322,21 @@
                         var readonlyAttr = canEdit ? '' : 'readonly';
 
                         html += '<div class="score-cell item">' +
-    '<div style="display:flex; align-items:center; gap:4px;">' +
-    '<input type="number" class="form-control score-input" ' +
-    'data-item-id="' + items[j].id + '" ' +
-    'data-original-score="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
-    'max="' + items[j].maxScore + '" min="-10" step="0.5" ' +
-    'placeholder="-10-' + 10 + '" ' +
-    'value="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
-    readonlyAttr + ' style="flex:1;">' +
-    '<i class="fa fa-commenting-o ' + iconClass + '" ' +
-    'data-item-id="' + items[j].id + '" ' +
-    'data-remark="' + (existingRemark || '') + '" ' +
-    'onclick="openRemarkPopover(this, \'' + user.userId + '\', \'' + items[j].id + '\')" ' +
-    'style="cursor:pointer; font-size:16px; flex-shrink:0;"></i>' +
-    '</div>' +
-    '</div>';
+                            '<div style="display:flex; align-items:center; gap:4px;">' +
+                            '<input type="number" class="form-control score-input" ' +
+                            'data-item-id="' + items[j].id + '" ' +
+                            'data-original-score="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
+                            'max="' + items[j].maxScore + '" min="-10" step="0.5" ' +
+                            'placeholder="-10-' + 10 + '" ' +
+                            'value="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
+                            readonlyAttr + ' style="flex:1;">' +
+                            '<i class="fa fa-commenting-o ' + iconClass + '" ' +
+                            'data-item-id="' + items[j].id + '" ' +
+                            'data-remark="' + (existingRemark || '') + '" ' +
+                            'onclick="openRemarkPopover(this, \'' + user.userId + '\', \'' + items[j].id + '\')" ' +
+                            'style="cursor:pointer; font-size:16px; flex-shrink:0;"></i>' +
+                            '</div>' +
+                            '</div>';
                     }
                     html += '<div class="score-cell total total-score">' + (total > 0 ? total.toFixed(1) : '0') + '</div>';
                     html += '</div>';
@@ -399,34 +399,34 @@
         }
 
         function saveRemarkPopover() {
-    var remark = $("#remarkTextarea").val();
-    if (currentEditKey) {
-        // 从 currentEditKey 中提取 userId 和 itemId
-        var parts = currentEditKey.split('_');
-        if (parts.length === 2) {
-            var userId = parts[0];
-            var itemId = parts[1];
+            var remark = $("#remarkTextarea").val();
+            if (currentEditKey) {
+                // 从 currentEditKey 中提取 userId 和 itemId
+                var parts = currentEditKey.split('_');
+                if (parts.length === 2) {
+                    var userId = parts[0];
+                    var itemId = parts[1];
 
-            if (remark && remark.trim() !== '') {
-                remarkCache[currentEditKey] = remark.trim();
-            } else {
-                delete remarkCache[currentEditKey];
-            }
+                    if (remark && remark.trim() !== '') {
+                        remarkCache[currentEditKey] = remark.trim();
+                    } else {
+                        delete remarkCache[currentEditKey];
+                    }
 
-            // 更新对应行的图标样式
-            var rowEl = $('.score-row[data-user-id="' + userId + '"]');
-            var iconEl = rowEl.find('.remark-icon[data-item-id="' + itemId + '"]');
-            if (remarkCache[currentEditKey]) {
-                iconEl.addClass('has-remark');
-                iconEl.attr('data-remark', remarkCache[currentEditKey]);
-            } else {
-                iconEl.removeClass('has-remark');
-                iconEl.removeAttr('data-remark');
+                    // 更新对应行的图标样式
+                    var rowEl = $('.score-row[data-user-id="' + userId + '"]');
+                    var iconEl = rowEl.find('.remark-icon[data-item-id="' + itemId + '"]');
+                    if (remarkCache[currentEditKey]) {
+                        iconEl.addClass('has-remark');
+                        iconEl.attr('data-remark', remarkCache[currentEditKey]);
+                    } else {
+                        iconEl.removeClass('has-remark');
+                        iconEl.removeAttr('data-remark');
+                    }
+                }
             }
+            closeRemarkPopover();
         }
-    }
-    closeRemarkPopover();
-}
 
         function closeRemarkPopover() {
             $("#remarkPopover").hide();
@@ -449,58 +449,58 @@
         // ========== 提交保存 ==========
 
         function submitScores() {
-    var batchNo = $("#batchNo").val();
-    var scoreList = [];
+            var batchNo = $("#batchNo").val();
+            var scoreList = [];
 
-    $(".score-row[data-user-id]").each(function () {
-        var userId = $(this).data('user-id');
-        $(this).find('.score-input').each(function () {
-            var $input = $(this);
-            var rawVal = $input.val().trim();
-            var itemId = $input.data('item-id');
-            var originalVal = $input.data('original-score');   // 加载时的原始分数
-            var remarkKey = userId + '_' + itemId;
+            $(".score-row[data-user-id]").each(function () {
+                var userId = $(this).data('user-id');
+                $(this).find('.score-input').each(function () {
+                    var $input = $(this);
+                    var rawVal = $input.val().trim();
+                    var itemId = $input.data('item-id');
+                    var originalVal = $input.data('original-score');   // 加载时的原始分数
+                    var remarkKey = userId + '_' + itemId;
 
-            // 计算当前分数（null 代表清空）
-            var score = (rawVal !== '') ? parseFloat(rawVal) : null;
-            if (isNaN(score)) score = null;
+                    // 计算当前分数（null 代表清空）
+                    var score = (rawVal !== '') ? parseFloat(rawVal) : null;
+                    if (isNaN(score)) score = null;
 
-            // 比较原始值和当前值：如果没变化，则跳过，不提交
-            if (score === null && originalVal === '') return;      // 都是空，跳过
-            if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
+                    // 比较原始值和当前值：如果没变化，则跳过，不提交
+                    if (score === null && originalVal === '') return;      // 都是空，跳过
+                    if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
 
-            // 有变化（含清空）的条目才加入提交列表
-            scoreList.push({
-                userId: userId,
-                itemId: itemId,
-                score: score,
-                batchNo: batchNo,
-                remark: remarkCache[remarkKey] || ''
+                    // 有变化（含清空）的条目才加入提交列表
+                    scoreList.push({
+                        userId: userId,
+                        itemId: itemId,
+                        score: score,
+                        batchNo: batchNo,
+                        remark: remarkCache[remarkKey] || ''
+                    });
+                });
             });
-        });
-    });
 
-    if (scoreList.length === 0) {
-        alert("没有需要保存的修改");
-        return;
-    }
-
-    $.ajax({
-        url: ctx + "kpi/score/saveBatch",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify(scoreList),
-        success: function (res) {
-            if (res.code == 0) {
-                alert("保存成功！");
-                loadTable();   // 刷新表格
-            } else {
-                alert("保存失败：" + res.msg);
+            if (scoreList.length === 0) {
+                alert("没有需要保存的修改");
+                return;
             }
-        }
-    });
 
-}
+            $.ajax({
+                url: ctx + "kpi/score/saveBatch",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(scoreList),
+                success: function (res) {
+                    if (res.code == 0) {
+                        alert("保存成功！");
+                        loadTable();   // 刷新表格
+                    } else {
+                        alert("保存失败：" + res.msg);
+                    }
+                }
+            });
+
+        }
     </script>
 </body>
 

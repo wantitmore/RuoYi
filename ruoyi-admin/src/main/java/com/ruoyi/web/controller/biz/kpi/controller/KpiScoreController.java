@@ -1,5 +1,7 @@
 package com.ruoyi.web.controller.biz.kpi.controller;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -28,7 +30,9 @@ import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
 import com.ruoyi.web.controller.biz.kpi.domain.QuickDeductDTO;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckItemService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -79,6 +83,9 @@ public class KpiScoreController extends BaseController {
 
     @Autowired
     private ISixCheckRecordService sixCheckRecordService;
+
+    @Autowired
+    private ISixCheckItemService sixCheckItemService;
 
     @RequiresPermissions("kpi:score:view")
     @GetMapping()
@@ -221,11 +228,11 @@ public class KpiScoreController extends BaseController {
     public AjaxResult saveBatch(@RequestBody List<KpiScore> scoreList) {
         System.out.println("=== 完整 scoreList: " + scoreList.toString());
         for (KpiScore score : scoreList) {
-            System.out.println("=== 收到数据: userId=" + score.getUserId() + 
-                   ", itemId=" + score.getItemId() + 
-                   ", score=[" + score.getScore() + "]" + 
-                   ", batchNo=[" + score.getBatchNo() + "]" +
-                   ", remark=[" + score.getRemark() + "]");
+            System.out.println("=== 收到数据: userId=" + score.getUserId() +
+                    ", itemId=" + score.getItemId() +
+                    ", score=[" + score.getScore() + "]" +
+                    ", batchNo=[" + score.getBatchNo() + "]" +
+                    ", remark=[" + score.getRemark() + "]");
             // 查询是否已有记录
             KpiScore query = new KpiScore();
             query.setUserId(score.getUserId());
@@ -376,23 +383,51 @@ public class KpiScoreController extends BaseController {
     @PostMapping("/quickDeduct")
     @ResponseBody
     public AjaxResult quickDeduct(@RequestBody QuickDeductDTO dto) {
-        // if (dto.getSixCheckItemId() == null) {
-        // return error("六必查检查项ID不能为空");
-        // }
-        System.out.println("sixCheckItemId = " + dto.getSixCheckItemId());
-        KpiScore score = new KpiScore();
-        score.setUserId(dto.getUserId());
-        score.setItemId(dto.getItemId());
-        score.setScore(dto.getScore());
-        score.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date())); // 自动取当前月份
-        score.setRemark(dto.getRemark());
-        score.setCreateBy(ShiroUtils.getLoginName());
-        kpiScoreService.insertKpiScore(score);
 
-        System.out.println("查询条件 itemId=" + dto.getSixCheckItemId() +
-                " checkDate=" + dto.getCheckDate() +
-                " shift=" + dto.getShift() +
-                " deptId=" + ShiroUtils.getSysUser().getDeptId());
+        // 1. 直接使用前端传来的考核项目ID（不再转换）
+        Long kpiItemId = dto.getItemId();
+        if (kpiItemId == null)
+            return error("未选择考核项目");
+
+        // 2. 查询已有记录
+        KpiScore existQuery = new KpiScore();
+        existQuery.setUserId(dto.getUserId());
+        existQuery.setItemId(kpiItemId);
+        existQuery.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+        List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
+
+        // 3. 生成带分数的扣分描述（BigDecimal 格式化为一位小数）
+        String userName = "";
+        SysUser user = userService.selectUserById(dto.getUserId());
+        if (user != null)
+            userName = user.getUserName();
+        BigDecimal newScore = dto.getScore() != null ? dto.getScore() : BigDecimal.ZERO;
+        String deductInfo = String.format("（关联加扣分-%s-%s分-%s）",
+                userName, newScore.setScale(1, RoundingMode.HALF_UP).toString(), dto.getRemark());
+
+
+        if (existList.size() > 0) {
+            // 已有记录：分数累加，备注拼接（换行）
+            KpiScore exist = existList.get(0);
+            BigDecimal oldScore = exist.getScore() != null ? exist.getScore() : BigDecimal.ZERO;
+            exist.setScore(oldScore.add(newScore));
+
+            String oldRemark = exist.getRemark() != null ? exist.getRemark() : "";
+            String newRemark = oldRemark.isEmpty() ? deductInfo : (oldRemark + "\n" + deductInfo);
+            exist.setRemark(newRemark);
+            exist.setUpdateBy(ShiroUtils.getLoginName());
+            kpiScoreService.updateKpiScore(exist);
+        } else {
+            // 无记录：插入新记录
+            KpiScore score = new KpiScore();
+            score.setUserId(dto.getUserId());
+            score.setItemId(kpiItemId);
+            score.setScore(newScore);
+            score.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+            score.setRemark(deductInfo);
+            score.setCreateBy(ShiroUtils.getLoginName());
+            kpiScoreService.insertKpiScore(score);
+        }
 
         if (dto.getSixCheckItemId() != null && StringUtils.isNotBlank(dto.getCheckDate())
                 && StringUtils.isNotBlank(dto.getShift())) {
@@ -409,19 +444,13 @@ public class KpiScoreController extends BaseController {
             query.setShift(dto.getShift());
             query.setDeptId(ShiroUtils.getSysUser().getDeptId());
             List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
-            System.out.println("查询结果数量=" + records.size());
 
             // 获取被考核人姓名
-            String userName = "";
-            SysUser user = userService.selectUserById(dto.getUserId());
             if (user != null)
                 userName = user.getUserName();
 
             // 构建扣分描述信息
-            String deductInfo = String.format("（关联加扣分-%s-%s）",
-                    userName,
-                    StringUtils.defaultString(dto.getRemark(), "无备注"));
-
+            
             if (records.isEmpty()) {
                 SixCheckRecord newRecord = new SixCheckRecord();
                 // ... 设置 itemId, checkDate, shift, deptId 等

@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.sixcheck.controller;
 
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -8,6 +9,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +27,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiItem;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
@@ -61,6 +67,9 @@ public class SixCheckRecordController extends BaseController {
 
     @Autowired
     private IKpiScoreService kpiScoreService; // 注入考核分数Service
+
+    @Autowired
+    private IKpiItemService kpiItemService; // 注入考核项目Service
 
     @GetMapping("/input")
     public String input(ModelMap mmap) {
@@ -303,65 +312,69 @@ public class SixCheckRecordController extends BaseController {
     @ResponseBody
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
-        Long itemId = Long.valueOf(params.get("itemId").toString());
+        Long itemId = Long.valueOf(params.get("itemId").toString()); // 考核项目ID
         String checkDate = params.get("checkDate").toString();
         String shift = params.get("shift").toString();
-        String deductInfo = params.get("deductInfo").toString(); // 要删除的那条扣分描述
+        String deductInfo = params.get("deductInfo").toString();
         Long deptId = ShiroUtils.getSysUser().getDeptId();
+        Long userId = ShiroUtils.getUserId(); // 当前登录用户即被考核人
 
-        // 1. 查询对应的六必查记录
+        // 1. 从扣分描述中解析分数（不再依赖用户名）
+        Pattern p = Pattern.compile("（关联加扣分-.+?-(.+?)分-.+?）");
+        Matcher m = p.matcher(deductInfo);
+        BigDecimal deductScore = BigDecimal.ZERO;
+        if (m.find()) {
+            deductScore = new BigDecimal(m.group(1).trim());
+        } else {
+            return error("扣分描述格式错误，无法解析分数");
+        }
+
+        // 2. 更新六必查记录（移除扣分描述）—— 使用前端额外传的 sixCheckItemId
+        Long sixCheckItemId = Long.valueOf(params.getOrDefault("sixCheckItemId", itemId).toString());
         SixCheckRecord query = new SixCheckRecord();
-        query.setItemId(itemId);
+        query.setItemId(sixCheckItemId);
         query.setCheckDate(DateUtils.parseDate(checkDate));
         query.setShift(shift);
         query.setDeptId(deptId);
         List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
-
-        if (records.isEmpty()) {
-            return error("未找到对应的六必查记录");
-        }
-
-        SixCheckRecord exist = records.get(0);
-        String oldValue = exist.getRecordValue();
-
-        // 2. 从记录内容中移除该条扣分信息，并恢复为“正常”或上一条内容
-        if (oldValue != null && oldValue.contains(deductInfo)) {
-            // 移除该条扣分描述（包括前面的换行符）
-            String newValue = oldValue.replace("\n" + deductInfo, "").replace(deductInfo, "");
-            if (newValue.trim().isEmpty()) {
-                newValue = "正常";
+        if (!records.isEmpty()) {
+            SixCheckRecord exist = records.get(0);
+            String oldValue = exist.getRecordValue();
+            if (oldValue != null && oldValue.contains(deductInfo)) {
+                String newValue = oldValue.replace("\n" + deductInfo, "").replace(deductInfo, "");
+                exist.setRecordValue(newValue.trim().isEmpty() ? "正常" : newValue.trim());
+                exist.setUpdateBy(ShiroUtils.getLoginName());
+                sixCheckRecordService.updateSixCheckRecord(exist);
             }
-            exist.setRecordValue(newValue);
-            exist.setUpdateBy(ShiroUtils.getLoginName());
-            sixCheckRecordService.updateSixCheckRecord(exist);
         }
 
-        // 3. 删除考核打分中对应的扣分记录
-        // 根据扣分描述中的信息匹配：被考核人姓名、备注内容
-        // 这里需要解析 deductInfo 获取用户名和备注，格式为“（关联扣分-用户名-备注）”
-        String userName = "";
-        String remark = "";
-        if (deductInfo != null) {
-            // 匹配中文全角括号：（关联加扣分-xxx-xxx）
-            java.util.regex.Pattern p = java.util.regex.Pattern.compile("（关联加扣分-(.+?)-(.+?)）");
-            java.util.regex.Matcher m = p.matcher(deductInfo);
-            if (m.find()) {
-                userName = m.group(1).trim();
-                remark = m.group(2).trim();
+        // 3. 更新考核打分记录：userId + 考核项目ID + 月份 精准定位
+        String batchNo = DateUtils.parseDateToStr("yyyy-MM", DateUtils.parseDate(checkDate));
+        KpiScore existQuery = new KpiScore();
+        existQuery.setUserId(userId);
+        existQuery.setItemId(itemId);
+        existQuery.setBatchNo(batchNo);
+        List<KpiScore> scoreList = kpiScoreService.selectKpiScoreList(existQuery);
+
+        if (!scoreList.isEmpty()) {
+            KpiScore existScore = scoreList.get(0);
+            // 减去分数（扣分为负，撤销时 subtract 负值 = 加回正分）
+            BigDecimal oldScore = existScore.getScore() != null ? existScore.getScore() : BigDecimal.ZERO;
+            existScore.setScore(oldScore.subtract(deductScore));
+
+            // 移除备注中对应的扣分描述
+            String oldRemark = existScore.getRemark() != null ? existScore.getRemark() : "";
+            String newRemark = oldRemark.replace("；" + deductInfo, "").replace(deductInfo, "");
+            newRemark = newRemark.replace(";；", ";").replace("\n\n", "\n").trim();
+            existScore.setRemark(newRemark);
+            existScore.setUpdateBy(ShiroUtils.getLoginName());
+
+            // 如果分数归零且备注为空，删除记录；否则更新
+            if (existScore.getScore().compareTo(BigDecimal.ZERO) == 0 && newRemark.isEmpty()) {
+                kpiScoreService.deleteKpiScoreByIds(existScore.getId().toString());
             } else {
-                // 匹配半角括号：(关联加扣分-xxx-xxx)
-                java.util.regex.Pattern p2 = java.util.regex.Pattern.compile("\\(关联加扣分-(.+?)-(.+?)\\)");
-                java.util.regex.Matcher m2 = p2.matcher(deductInfo);
-                if (m2.find()) {
-                    userName = m2.group(1).trim();
-                    remark = m2.group(2).trim();
-                }
+                kpiScoreService.updateKpiScore(existScore);
             }
-        }
-
-        if (StringUtils.isNotBlank(userName) && StringUtils.isNotBlank(remark)) {
-            // 根据用户名和备注删除对应的 kpi_score 记录
-            kpiScoreService.deleteByUserAndRemark(userName, remark, checkDate, deptId);
         }
 
         return success("撤销成功");

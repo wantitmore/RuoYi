@@ -135,6 +135,8 @@
             });
         }
         function cancelDeduct(itemId, deductInfo) {
+            console.log('撤销的 itemId:', itemId);
+    console.log('撤销的 deductInfo:', deductInfo);
             if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) return;
 
             $.ajax({
@@ -271,7 +273,7 @@
                             contentType: "application/json",
                             data: JSON.stringify({
                                 userId: userId,
-                                itemId: itemId,
+                                itemId: $("#deductItemId").val(),
                                 score: parseFloat(score),
                                 remark: remark,
                                 sixCheckItemId: window._currentDeductInfo ? window._currentDeductInfo.sixCheckItemId : null,
