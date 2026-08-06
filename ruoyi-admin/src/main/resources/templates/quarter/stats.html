@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <th:block th:include="include :: header('统计结果')" />
+    <style>
+        .table th,
+        .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .avg-good {
+            color: #67c23a;
+            font-weight: bold;
+        }
+
+        .avg-mid {
+            color: #e6a23c;
+            font-weight: bold;
+        }
+
+        .avg-poor {
+            color: #f56c6c;
+            font-weight: bold;
+        }
+
+        .no-score {
+            color: #c0c0c0;
+        }
+
+        .evaluator-list {
+            font-size: 13px;
+            color: #409EFF;
+        }
+
+        .empty-evaluator {
+            font-size: 13px;
+            color: #f56c6c;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>季度考核统计 <small id="batchInfo" class="text-muted"></small></h5>
+                    </div>
+                    <div class="ibox-content">
+                        <table class="table table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th style="width:60px;">序号</th>
+                                    <th style="width:120px;">被考核人</th>
+                                    <th style="width:120px;">岗位</th>
+                                    <th style="width:100px;">平均分</th>
+                                    <th>评分人</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <th:block th:include="include :: footer" />
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var batchNo = [[${ param.batchNo }]];
+        var deptId = [[${ param.deptId != null ? param.deptId : '' }]];
+
+        $(function () {
+            if (!batchNo) {
+                $("#statsBody").html('<tr><td colspan="5" class="text-center">缺少批次参数</td></tr>');
+                return;
+            }
+            var params = { batchNo: batchNo };
+            if (deptId) params.deptId = deptId;
+             $.get(ctx + "quarter/stats", { batchNo: batchNo, deptId: deptId }, function(res) {
+                // batchNo: batchNo,
+                // deptId: deptId
+                if (res.code != 0) {
+                    $("#statsBody").html('<tr><td colspan="5" class="text-center text-danger">加载失败：' + res.msg + '</td></tr>');
+                    return;
+                }
+                var data = res.data;
+                if (!data || data.length === 0) {
+                    $("#statsBody").html('<tr><td colspan="5" class="text-center">暂无数据</td></tr>');
+                    return;
+                }
+
+                var html = '';
+                console.log("=== stats: 返回数据=" + JSON.stringify(data));
+                $.each(data, function (i, row) {
+                    var avg = row.avgScore || 0;
+                    var avgClass = avg >= 90 ? 'avg-good' : (avg >= 70 ? 'avg-mid' : (avg > 0 ? 'avg-poor' : ''));
+                    var avgDisplay = avg > 0 ? avg.toFixed(2) : '<span class="no-score">未评分</span>';
+
+                    var evaluators = row.evaluators || '';
+                    var evaluatorHtml = evaluators
+                        ? '<span class="evaluator-list">' + evaluators + '</span>'
+                        : '<span class="empty-evaluator">暂无评分</span>';
+
+                    html += '<tr>';
+                    html += '<td>' + (i + 1) + '</td>';
+                    html += '<td>' + row.userName + '</td>';
+                    html += '<td>' + (row.postName || '') + '</td>';
+                    html += '<td class="' + avgClass + '">' + avgDisplay + '</td>';
+                    html += '<td>' + evaluatorHtml + '</td>';
+                    html += '</tr>';
+                });
+                $("#statsBody").html(html);
+                $("#batchInfo").text('（' + batchNo + '）');
+            });
+        });
+    </script>
+</body>
+
+</html>

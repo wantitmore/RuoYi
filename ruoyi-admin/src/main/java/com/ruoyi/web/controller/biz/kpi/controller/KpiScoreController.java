@@ -34,6 +34,8 @@ import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckItemService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
+import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
+import com.ruoyi.web.controller.biz.video.service.IVideoPlaybackRecordService;
 
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -86,6 +88,9 @@ public class KpiScoreController extends BaseController {
 
     @Autowired
     private ISixCheckItemService sixCheckItemService;
+
+    @Autowired
+    private IVideoPlaybackRecordService videoPlaybackRecordService;
 
     @RequiresPermissions("kpi:score:view")
     @GetMapping()
@@ -535,4 +540,94 @@ public class KpiScoreController extends BaseController {
         }
         return months;
     }
+
+    @RequiresPermissions("kpi:score:edit")
+    @PostMapping("/videoQuickDeduct")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult videoQuickDeduct(@RequestBody QuickDeductDTO dto) {
+
+        // 2. 查询已有记录
+        String batchNo = new SimpleDateFormat("yyyy-MM").format(new Date());
+        KpiScore existQuery = new KpiScore();
+        existQuery.setUserId(dto.getUserId());
+        existQuery.setItemId(dto.getItemId());
+        existQuery.setBatchNo(batchNo);
+        List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
+
+        // 3. 生成扣分描述（用于视频回放和备注）
+        String userName = dto.getUserId().toString(); // 默认，下面会从数据库查
+        SysUser user = userService.selectUserById(dto.getUserId());
+        if (user != null)
+            userName = user.getUserName();
+        String deductInfo = String.format("（关联加扣分-%s-%.1f分-%s）",
+                userName, dto.getScore().doubleValue(), dto.getRemark());
+
+        Long finalScoreId; // 最终返回给前端的 kpi_score ID
+        System.out.println("=== videoQuickDeduct: 查询已有记录，existList.size()=" + existList.size() + ", dto.getUserId()="
+                        + dto.getUserId() + ", dto.getItemId()=" + dto.getItemId() + ", batchNo=" + batchNo);
+        if (existList.size() > 0) {
+            // 已有记录：累加分数，备注换行追加
+            KpiScore exist = existList.get(0);
+            exist.setScore(exist.getScore().add(dto.getScore()));
+            System.out.println("=== videoQuickDeduct: 更新已有记录，旧备注=" + exist.getRemark() 
+            + ", 新扣分信息=" + deductInfo + ", 新分数=" + exist.getScore());
+            String oldRemark = exist.getRemark() != null ? exist.getRemark() : "";
+            exist.setRemark(oldRemark.isEmpty() ? deductInfo : oldRemark + "\n" + deductInfo);
+            exist.setUpdateBy(ShiroUtils.getLoginName());
+            kpiScoreService.updateKpiScore(exist);
+            finalScoreId = exist.getId(); // 返回已有记录的ID
+        } else {
+            // 新记录
+            KpiScore score = new KpiScore();
+            score.setUserId(dto.getUserId());
+            score.setItemId(dto.getItemId());
+            score.setScore(dto.getScore());
+            score.setBatchNo(batchNo);
+            score.setRemark(deductInfo);
+            score.setCreateBy(ShiroUtils.getLoginName());
+            kpiScoreService.insertKpiScore(score);
+            finalScoreId = score.getId();
+        }
+
+        System.out.println(
+                "=== videoQuickDeduct: 保存考核dto.getVideoItemId() =" + dto.getVideoItemId() + ", dto.getVideoDate()="
+                        + dto.getVideoDate() + ", dto.getRemark()=" + dto.getRemark());
+
+        // 2. 更新视频回放记录内容（追加关联扣分信息）
+        if (dto.getVideoItemId() != null) {
+            VideoPlaybackRecord query = new VideoPlaybackRecord();
+            query.setItemId(dto.getVideoItemId());
+            query.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+            query.setDeptId(ShiroUtils.getSysUser().getDeptId());
+            List<VideoPlaybackRecord> records = videoPlaybackRecordService.selectVideoPlaybackRecordList(query);
+            System.out.println("=== videoQuickDeduct: 查询视频回放记录，records.size()=" + records.size());
+            if (user != null)
+                userName = user.getUserName();
+
+            if (!records.isEmpty()) {
+                VideoPlaybackRecord exist = records.get(0);
+                String oldValue = exist.getPlaybackStatus();
+                System.out.println("=== videoQuickDeduct: 旧的回放状态 oldValue=" + oldValue);
+                if (StringUtils.isNotBlank(oldValue) && !"正常".equals(oldValue)) {
+                    exist.setPlaybackStatus(oldValue + "\n" + deductInfo);
+                } else {
+                    exist.setPlaybackStatus(deductInfo);
+                }
+                exist.setUpdateBy(ShiroUtils.getLoginName());
+                videoPlaybackRecordService.updateVideoPlaybackRecord(exist);
+            } else {
+                VideoPlaybackRecord newRecord = new VideoPlaybackRecord();
+                newRecord.setItemId(dto.getVideoItemId());
+                newRecord.setPlaybackStatus(deductInfo);
+                newRecord.setBatchNo(new SimpleDateFormat("yyyy-MM").format(new Date()));
+                newRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
+                newRecord.setCreateBy(ShiroUtils.getLoginName());
+                videoPlaybackRecordService.insertVideoPlaybackRecord(newRecord);
+            }
+        }
+
+        return success("加扣分成功！").put("kpiScoreId", finalScoreId);
+    }
+
 }

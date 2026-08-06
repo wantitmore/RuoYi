@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.video.controller;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Map;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +25,7 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.web.controller.biz.common.service.CommonDeductService;
 import com.ruoyi.web.controller.biz.video.domain.VideoCheckItem;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
 import com.ruoyi.web.controller.biz.video.service.IVideoCheckItemService;
@@ -37,6 +40,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
     @Autowired
     private IVideoCheckItemService videoCheckItemService;
+
+    @Autowired
+    private CommonDeductService commonDeductService;
 
     private String prefix = "video/record";
 
@@ -59,10 +65,13 @@ public class VideoPlaybackRecordController extends BaseController {
         return getDataTable(list);
     }
 
+    
+
     // ==================== 录入页（菜单 url: video/record/input）====================
     @GetMapping("/input")
     public String input(ModelMap mmap) {
         mmap.put("canEdit", ShiroUtils.getSubject().isPermitted("video:record:edit"));
+        mmap.put("currentDeptId", ShiroUtils.getSysUser().getDeptId());
         return "video/input";
     }
 
@@ -113,7 +122,39 @@ public class VideoPlaybackRecordController extends BaseController {
         }
         return success("保存成功");
     }
-    
+
+    @RequiresPermissions("video:record:edit")
+    @PostMapping("/cancelDeduct")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
+        Long itemId = Long.valueOf(params.get("itemId").toString());
+        // String videoDate = params.get("videoDate").toString();
+        String deductInfo = params.get("deductInfo").toString();
+        Long deptId = ShiroUtils.getSysUser().getDeptId();
+
+        // 1. 更新视频回放记录
+        VideoPlaybackRecord query = new VideoPlaybackRecord();
+        query.setItemId(itemId);
+        // query.setBatchNo(videoDate.substring(0, 7));
+        query.setDeptId(deptId);
+        List<VideoPlaybackRecord> records = videoPlaybackRecordService.selectVideoPlaybackRecordList(query);
+        if (!records.isEmpty()) {
+            VideoPlaybackRecord exist = records.get(0);
+            exist.setPlaybackStatus(commonDeductService.removeDeductDesc(exist.getPlaybackStatus(), deductInfo));
+            exist.setUpdateBy(ShiroUtils.getLoginName());
+            videoPlaybackRecordService.updateVideoPlaybackRecord(exist);
+        }
+
+        // 2. 更新考核打分记录
+        String userName = commonDeductService.parseUserName(deductInfo);
+        BigDecimal scoreChange = commonDeductService.parseScoreChange(deductInfo);
+        // String batchNo = videoDate.substring(0, 7);
+        commonDeductService.updateKpiScoreByDeduct(userName, null, deductInfo,
+                scoreChange != null ? scoreChange.negate() : null);
+
+        return success("撤销成功");
+    }
 
     // ==================== 以下为生成器自动生成的 CRUD 方法（请保持原有代码不变）====================
 

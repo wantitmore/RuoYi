@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('季度考核')" />
+    <style>
+        .grade-select {
+            width: 100px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        #dataTable th {
+            position: sticky;
+            top: 0;
+            background: #f5f5f5;
+            z-index: 10;
+        }
+
+        #dataTable td:first-child,
+        #dataTable th:first-child {
+            position: sticky;
+            left: 0;
+            background: #fff;
+            z-index: 5;
+        }
+    </style>
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>季度考核</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <!-- 筛选区 -->
+                        <div class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">季度：</label>
+                                <div class="col-sm-2">
+                                    <select id="batchNo" class="form-control">
+                                        <option value="">请选择季度</option>
+                                    </select>
+                                </div>
+                                <label class="col-sm-1 control-label">部门：</label>
+                                <div class="col-sm-2">
+                                    <select id="deptSelect" class="form-control">
+                                        <option value="">全部部门</option>
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-3">
+                                    <button class="btn btn-primary" onclick="loadData()">
+                                        <i class="fa fa-search"></i> 查询
+                                    </button>
+                                    <button class="btn btn-success" onclick="saveData()">
+                                        <i class="fa fa-save"></i> 保存
+                                    </button>
+                                    <button class="btn btn-info" onclick="showStats()">
+                                        <i class="fa fa-bar-chart"></i> 统计结果
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 矩阵表格 -->
+                        <div class="table-responsive" style="display:none;" id="tableWrapper">
+                            <table id="dataTable" class="table table-bordered table-hover">
+                                <thead id="tableHead"></thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var currentFactors = [];
+        var canEdit = [[${ canEdit }]];
+
+        // 初始化季度下拉框（当前季度及前后各4个季度）
+        $(function () {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = now.getMonth() + 1;
+            var currentQ = Math.ceil(month / 3);
+            var options = '';
+            for (var y = year - 1; y <= year + 1; y++) {
+                for (var q = 1; q <= 4; q++) {
+                    var val = y + '-Q' + q;
+                    var selected = (y === year && q === currentQ) ? ' selected' : '';
+                    options += '<option value="' + val + '"' + selected + '>' + val + '</option>';
+                }
+            }
+            $("#batchNo").html(options);
+            loadData();
+        });
+
+        function loadData() {
+            var batchNo = $("#batchNo").val();
+            var deptId = $("#deptSelect").val();
+            if (!batchNo) { alert("请选择季度"); return; }
+            var type = 'quarter';
+            $.get(ctx + "quarter/data", { batchNo: batchNo, deptId: deptId, type: type }, function (res) {
+                if (res.code != 0) { alert("加载失败"); return; }
+                var factors = res.data.factors;
+                var rows = res.data.rows;
+                currentFactors = factors;
+
+                // 构建表头
+                var headHtml = '<tr><th>岗位</th><th>人员</th>';
+                console.log("factors:", factors);
+                $.each(factors, function (i, f) {
+                    headHtml += '<th title="' + (f.content || '') + '">' + f.name + '</th>';
+                });
+
+                headHtml += '<th>平均分</th></tr>';
+                $("#tableHead").html(headHtml);
+
+                // 构建表体
+                var bodyHtml = '';
+                $.each(rows, function (i, row) {
+                    bodyHtml += '<tr>';
+                    bodyHtml += '<td>' + (row.postName || '') + '</td>';
+                    bodyHtml += '<td>' + row.userName + '</td>';
+                    $.each(factors, function (j, f) {
+                        var grade = row['factor_' + f.id + '_grade'] || '';
+                        bodyHtml += '<td>';
+                        bodyHtml += '<select class="form-control grade-select" data-user-id="' + row.userId + '" data-factor-id="' + f.id + '" ' + (canEdit ? '' : 'disabled') + '>';
+                        bodyHtml += '<option value="">-</option>';
+                        bodyHtml += '<option value="好"' + (grade === '好' ? ' selected' : '') + '>好</option>';
+                        bodyHtml += '<option value="较好"' + (grade === '较好' ? ' selected' : '') + '>较好</option>';
+                        bodyHtml += '<option value="一般"' + (grade === '一般' ? ' selected' : '') + '>一般</option>';
+                        bodyHtml += '<option value="差"' + (grade === '差' ? ' selected' : '') + '>差</option>';
+                        bodyHtml += '</select>';
+                        bodyHtml += '</td>';
+                    });
+                    bodyHtml += '<td class="avg-score">' + row.avgScore + '</td>';
+                    bodyHtml += '</tr>';
+                });
+                $("#tableBody").html(bodyHtml);
+                $("#tableWrapper").show();
+            });
+        }
+
+        function saveData() {
+            if (!canEdit) { alert("没有编辑权限"); return; }
+            var batchNo = $("#batchNo").val();
+            if (!batchNo) { alert("请选择季度"); return; }
+            var factorGoodCount = {};  // 记录每个因素下“好”的数量
+            $(".grade-select").each(function () {
+                var factorId = $(this).data('factor-id');
+                var grade = $(this).val();
+                if (grade === '好') {
+                    if (!factorGoodCount[factorId]) {
+                        factorGoodCount[factorId] = 0;
+                    }
+                    factorGoodCount[factorId]++;
+                }
+            });
+
+            // 检查是否有因素超过1个“好”
+            for (var factorId in factorGoodCount) {
+                if (factorGoodCount[factorId] > 1) {
+                    alert(" 同一评价要素只能有一个人被评为“好");
+                    return;  // 终止保存
+                }
+            }
+
+            // 获取所有因素
+            var factorIds = [];
+            $(".grade-select").each(function () {
+                var fid = $(this).data('factor-id');
+                if (factorIds.indexOf(fid) === -1) factorIds.push(fid);
+            });
+
+            // 按因素逐个保存
+            var promises = [];
+            $.each(factorIds, function (i, factorId) {
+                var grades = [];
+                $('.grade-select[data-factor-id="' + factorId + '"]').each(function () {
+                    var userId = $(this).data('user-id');
+                    var grade = $(this).val();
+                    if (grade) {
+                        grades.push({ userId: userId, grade: grade });
+                    }
+                });
+
+                if (grades.length > 0) {
+                    promises.push(
+                        $.ajax({
+                            url: ctx + "quarter/save",
+                            type: "POST",
+                            contentType: "application/json",
+                            data: JSON.stringify({
+                                batchNo: batchNo,
+                                factorId: factorId,
+                                grades: grades
+                            })
+                        })
+                    );
+                }
+            });
+
+            Promise.all(promises).then(function () {
+                alert("保存成功");
+                loadData();  // 刷新平均分
+            }).catch(function () {
+                alert("保存失败");
+            });
+        }
+        function showStats() {
+            var batchNo = $("#batchNo").val();
+            var deptId = $("#deptSelect").val();
+            if (!batchNo) {
+                alert("请选择季度");
+                return;
+            }
+
+            layer.open({
+                type: 2,
+                title: '季度考核统计结果',
+                area: ['850px', '600px'],
+                content: ctx + 'quarter/statsPage?batchNo=' + batchNo + '&deptId=' + deptId,
+                btn: ['关闭']
+            });
+        }
+    </script>
+</body>
+
+</html>

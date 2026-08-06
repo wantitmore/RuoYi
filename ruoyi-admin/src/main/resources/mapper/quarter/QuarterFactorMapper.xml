@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.ld_quarter_common.mapper.QuarterFactorMapper">
+
+    <resultMap type="com.ruoyi.web.controller.biz.ld_quarter_common.domain.QuarterFactor" id="QuarterFactorResult">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="content" column="content"/>
+        <result property="type" column="type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, name, content, type, sort_order, create_by, create_time, update_by, update_time from quarter_factor
+    </sql>
+
+    <select id="selectQuarterFactorList" parameterType="QuarterFactor" resultMap="QuarterFactorResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="name != null and name != ''">and name like concat('%', #{name}, '%')</if>
+            <if test="type != null and type != ''">and type = #{type}</if>
+            <if test="content != null and content != ''">and content like concat('%', #{content}, '%')</if>
+        </where>
+        order by sort_order
+    </select>
+
+    <select id="selectQuarterFactorById" parameterType="Long" resultMap="QuarterFactorResult">
+        <include refid="selectVo"/> where id = #{id}
+    </select>
+
+    <insert id="insertQuarterFactor" parameterType="QuarterFactor" useGeneratedKeys="true" keyProperty="id">
+        insert into quarter_factor (name, content, type, sort_order, create_by, create_time)
+        values (#{name}, #{content}, #{type}, #{sortOrder}, #{createBy}, now())
+    </insert>
+
+    <update id="updateQuarterFactor" parameterType="QuarterFactor">
+        update quarter_factor
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="type != null">type = #{type},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = now()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteQuarterFactorById" parameterType="Long">
+        delete from quarter_factor where id = #{id}
+    </delete>
+
+    <delete id="deleteQuarterFactorByIds" parameterType="String">
+        delete from quarter_factor where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

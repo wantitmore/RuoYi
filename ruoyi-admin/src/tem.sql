@@ -285,7 +285,7 @@ WHERE dept_id = 107
       WHERE vci.dept_id = 108 AND vci.check_position = video_check_item.check_position
   );
 
-  --六必查更改 1. 把“监狱值班组巡查情况”改为“上级问题通报”
+--六必查更改 1. 把“监狱值班组巡查情况”改为“上级问题通报”
 UPDATE six_check_item
 SET name = '上级问题通报'
 WHERE name = '监狱值班组巡查情况';
@@ -299,3 +299,95 @@ WHERE d.del_flag = '0'
       SELECT 1 FROM six_check_item si
       WHERE si.dept_id = d.dept_id AND si.name = '其它'
   );
+
+--分区负责人评价表
+  CREATE TABLE quarter_factor (
+    id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    name        varchar(100) NOT NULL COMMENT '评价要素',
+    content     varchar(500) DEFAULT NULL COMMENT '评价内容',
+    sort_order  int(4)       DEFAULT 0 COMMENT '排序号',
+    type        varchar(50)  DEFAULT 'quarter' COMMENT '考核类型',
+    create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
+    create_time datetime     COMMENT '创建时间',
+    update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
+    update_time datetime     COMMENT '更新时间',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='分监区负责人评价表';
+
+CREATE TABLE quarter_factor (
+    id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    name        varchar(100) NOT NULL COMMENT '评价要素',
+    content     varchar(500) DEFAULT NULL COMMENT '评价内容',
+    sort_order  int(4)       DEFAULT 0 COMMENT '排序号',
+    type        varchar(50)  DEFAULT 'quarter' COMMENT '考核类型',
+    create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
+    create_time datetime     COMMENT '创建时间',
+    update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
+    update_time datetime     COMMENT '更新时间',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='评价要素表';
+
+INSERT INTO quarter_factor (name, content, sort_order) VALUES
+('政治思想方面', '具体为：坚定理想信念、对党忠诚，遵守政治纪律和政治规矩；自觉增强“四个意识”、坚定“四个自信”、做到“两个维护”；自觉参加监狱党委各项政治学习与活动。', 1),
+('工作落实方面', '具体为围绕监狱中心工作，服务大局，科室、监区领导成员间团结协作；认真贯彻落实上级政策、精神，工作作风严谨，积极解决工作中重点、难点问题。带领的队伍有活力、凝聚力和战斗力。', 2),
+('组织纪律方面', '具体为：严格树立组织观念，遵守组织纪律，服从组织安排；遵守廉政规定，严守警囚关系底线；坚守忠诚老实、公道正派、实事求是、清正廉洁等价值观，遵守社会公德、职业道德、家庭美德。', 3);
+
+--分区季度考核记录表
+CREATE TABLE quarter_score (
+    id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    user_id     bigint(20)   NOT NULL COMMENT '被考核人ID',
+    factor_id   bigint(20)   NOT NULL COMMENT '考察因素ID',
+    grade       varchar(10)  NOT NULL COMMENT '评价等级（好/较好/一般/差）',
+    score       int(4)       NOT NULL COMMENT '对应分数（95/85/70/55）',
+    batch_no    varchar(7)   NOT NULL COMMENT '季度（YYYY-QX）',
+    dept_id     bigint(20)   NOT NULL COMMENT '所属部门ID',
+    create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
+    create_time datetime     COMMENT '创建时间',
+    update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
+    update_time datetime     COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_factor_quarter (user_id, factor_id, batch_no, create_by)
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='分监区负责人季度考核记录表';
+
+-- 在“考核结果”旁边新增“季度考核”菜单
+SET @kpi_menu_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '量化考核' AND menu_type = 'M');
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark)
+VALUES ('季度考核', @kpi_menu_id, 6, 'C', '0', 'quarter/list', 'quarter:view', '#', 'admin', NOW(), '', NULL, '季度考核模块');
+
+SET @quarter_menu_id = LAST_INSERT_ID();
+
+-- 按钮权限
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time, update_by, update_time, remark) VALUES
+('季度考核查询', @quarter_menu_id, 1, 'F', '0', '', 'quarter:list', '#', 'admin', NOW(), '', NULL, ''),
+('季度考核新增', @quarter_menu_id, 2, 'F', '0', '', 'quarter:add', '#', 'admin', NOW(), '', NULL, ''),
+('季度考核修改', @quarter_menu_id, 3, 'F', '0', '', 'quarter:edit', '#', 'admin', NOW(), '', NULL, ''),
+('季度考核删除', @quarter_menu_id, 4, 'F', '0', '', 'quarter:remove', '#', 'admin', NOW(), '', NULL, '');
+
+-- 授权给超级管理员
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id FROM sys_menu WHERE menu_name LIKE '%季度考核%'
+AND NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = 1 AND menu_id = sys_menu.menu_id);
+--岗位编码
+CREATE TABLE assess_post_config (
+    id          bigint(20)   NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    type        varchar(50)  NOT NULL COMMENT '考核类型：quarter-季度，common-普通警员',
+    post_code   varchar(64)  NOT NULL COMMENT '岗位编码（对应 sys_post.post_code）',
+    sort_order  int(4)       DEFAULT 0 COMMENT '排序号（用于控制岗位展示顺序）',
+    create_by   varchar(64)  DEFAULT '' COMMENT '创建者',
+    create_time datetime     COMMENT '创建时间',
+    update_by   varchar(64)  DEFAULT '' COMMENT '更新者',
+    update_time datetime     COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_type_post (type, post_code)  -- 防止同一类型重复插入相同岗位
+) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='考核类型与岗位映射配置表';
+
+-- 分区领导季度考核需要哪些岗位
+INSERT INTO assess_post_config (type, post_code, sort_order) VALUES 
+('quarter', 'fq_leader', 1),   -- 分区领导
+
+-- 普通警员考核需要哪些岗位
+INSERT INTO assess_post_config (type, post_code, sort_order) VALUES 
+('common', '1qu_user', 1);
+('common', '2qu_user', 2);
+('common', 'sec', 3);

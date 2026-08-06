@@ -15,7 +15,14 @@
     <!-- 避免IE使用兼容模式 -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link rel="shortcut icon" href="../static/favicon.ico" th:href="@{favicon.ico}"/>
-    <style type="text/css">label.error { position:inherit;  }</style>
+    <style type="text/css">label.error { position:inherit;  }
+         .signinpanel .col-sm-5 {
+        float: right !important;
+        /* margin-right: 5% !important;  离右边留点空，不贴边 */
+        min-height: 50vh !important;
+        display: flex !important;
+        align-items: center !important; }
+    </style>
     <script>
         if(window.top!==window.self){alert('未登录或登录超时。请重新登录');window.top.location=window.location};
     </script>
@@ -29,7 +36,7 @@
                         <!-- <h1><img alt="[ 若依 ]" src="../static/ruoyi.png" th:src="@{/ruoyi.png}"></h1> -->
                     </div>
                     <div class="m-b"></div>
-                    <h4 style="color: black;font-size: 36px;">欢迎使用 <strong>量化考核系统</strong></h4>
+                    <h4 style="color: black;font-size: 36px;"></strong></h4>
                     <!-- <ul class="m-b">
                         <li><i class="fa fa-arrow-circle-o-right m-r-xs"></i> SpringBoot</li>
                         <li><i class="fa fa-arrow-circle-o-right m-r-xs"></i> Mybatis</li>

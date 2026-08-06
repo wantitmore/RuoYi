@@ -2,20 +2,23 @@ html {
 	height:100%
 }
 body.signin {
-	height:auto;
-	background:url(../img/login-background.jpg) no-repeat center fixed;
-	-webkit-background-size:cover;
-	-moz-background-size:cover;
-	-o-background-size:cover;
-	background-size:cover
+    height: auto;
+    /* 原 background 行改为以下两行 */
+    /* background: url(../img/login-background.jpg) no-repeat fixed; */
+    background-position: center 50%;  /* 垂直位置从50%下移到30%（数值越大越靠下） */
+    -webkit-background-size: contain;
+    -moz-background-size: contain;
+    -o-background-size: contain;
+    background-size: contain;
 }
+
 .signinpanel {
     display: flex;
-    align-items: center; 
+    align-items: center;
     min-height: 100vh;
-	width:750px;
-	margin:10% auto 0;
-	color:rgba(255,255,255,.95)
+    width: 750px;
+    margin: 15% auto 0;   /* 原10%改为15%，增大上边距 */
+    color: rgba(255,255,255,.95);
 }
 .signinpanel .logopanel {
 	float:none;
@@ -26,6 +29,7 @@ body.signin {
 .signinpanel .signin-info  {
      display: flex;
 	 align-items: center; 
+     /* text-align: center !important; */
      color:rgba(0,0,255,.95)
 }
 .signinpanel .signin-info ul {

@@ -350,7 +350,7 @@ public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
     String remark = null;
 
     // 匹配格式：（关联加扣分-用户名-分数-备注）
-    java.util.regex.Pattern p1 = java.util.regex.Pattern.compile("（关联加扣分-(.+?)-(\\d+\\.?\\d*)分-(.+)）");
+    java.util.regex.Pattern p1 = java.util.regex.Pattern.compile("（关联加扣分-(.+?)-(-?\\d+\\.?\\d*)分-(.+)）");
     java.util.regex.Matcher m1 = p1.matcher(deductInfo);
     if (m1.find()) {
         userName = m1.group(1).trim();
@@ -394,7 +394,10 @@ public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
         if (score.getRemark() != null && score.getRemark().contains(deductInfo)) {
             // 扣掉分数（deductScore 是扣分，为负数，加上它就是扣减）
             if (score.getScore() != null) {
-                score.setScore(score.getScore().add(deductScore));
+
+                score.setScore(score.getScore().subtract(deductScore));
+                System.out.println("=== cancelDeduct: 扣减考核分数，userName=" + userName + ", batchNo=" + batchNo
+                        + ", scoreId=" + score.getId() + ", 扣减分数=" + deductScore + ", 新分数=" + score.getScore());
             }
             // 从备注中移除扣分描述
             String newRemark = score.getRemark().replace(deductInfo, "").trim();

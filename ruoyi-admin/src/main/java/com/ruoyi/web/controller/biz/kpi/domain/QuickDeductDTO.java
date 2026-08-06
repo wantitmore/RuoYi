@@ -11,6 +11,8 @@ public class QuickDeductDTO {
     private String checkDate; // 值班日期（yyyy-MM-dd）
     private String shift; // 班次
     private String currentRecordValue;
+    private Long videoItemId;      // video_check_item 的 ID
+    private String videoDate;      // 值班日期（yyyy-MM-dd）
 
     public Long getUserId() {
         return userId;
@@ -76,13 +78,29 @@ public class QuickDeductDTO {
         this.currentRecordValue = currentRecordValue;
     }
 
-    
+    public Long getVideoItemId() {
+        return videoItemId;
+    }
+
+    public void setVideoItemId(Long videoItemId) {
+        this.videoItemId = videoItemId;
+    }
+
+
+    public String getVideoDate() {
+        return videoDate;
+    }
+
+    public void setVideoDate(String videoDate) {
+        this.videoDate = videoDate;
+    }
 
     @Override
     public String toString() {
         return "QuickDeductDTO [userId=" + userId + ", itemId=" + itemId + ", score=" + score + ", remark=" + remark
                 + ", getUserId()=" + getUserId() + ", getItemId()=" + getItemId() + ", getScore()=" + getScore()
-                + ", getRemark()=" + getRemark() + ", getClass()=" + getClass() + ", hashCode()=" + hashCode()
+                + ", getRemark()=" + getRemark() + ", getVideoItemId()=" + getVideoItemId() + ", getVideoDate()=" + getVideoDate()
+                + ", getClass()=" + getClass() + ", hashCode()=" + hashCode()
                 + ", toString()=" + super.toString() + "]";
     }
 

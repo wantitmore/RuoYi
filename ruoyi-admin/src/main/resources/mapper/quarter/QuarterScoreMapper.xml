@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.ld_quarter_common.mapper.QuarterScoreMapper">
+
+    <resultMap type="com.ruoyi.web.controller.biz.ld_quarter_common.domain.QuarterScore" id="QuarterScoreResult">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="factorId" column="factor_id"/>
+        <result property="grade" column="grade"/>
+        <result property="score" column="score"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, user_id, factor_id, grade, score, batch_no, dept_id, create_by, create_time, update_by, update_time
+        from quarter_score
+    </sql>
+
+    <select id="selectQuarterScoreList" parameterType="QuarterScore" resultMap="QuarterScoreResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="userId != null">and user_id = #{userId}</if>
+            <if test="factorId != null">and factor_id = #{factorId}</if>
+            <if test="batchNo != null and batchNo != ''">and batch_no = #{batchNo}</if>
+            <if test="deptId != null">and dept_id = #{deptId}</if>
+            <if test="createBy != null and createBy != ''">and create_by = #{createBy}</if>
+        </where>
+    </select>
+
+    <select id="selectQuarterScoreById" parameterType="Long" resultMap="QuarterScoreResult">
+        <include refid="selectVo"/> where id = #{id}
+    </select>
+
+    <insert id="insertQuarterScore" parameterType="QuarterScore" useGeneratedKeys="true" keyProperty="id">
+        insert into quarter_score (user_id, factor_id, grade, score, batch_no, dept_id, create_by, create_time)
+        values (#{userId}, #{factorId}, #{grade}, #{score}, #{batchNo}, #{deptId}, #{createBy}, now())
+    </insert>
+
+    <update id="updateQuarterScore" parameterType="QuarterScore">
+        update quarter_score
+        <set>
+            <if test="grade != null">grade = #{grade},</if>
+            <if test="score != null">score = #{score},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = now()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteQuarterScoreById" parameterType="Long">
+        delete from quarter_score where id = #{id}
+    </delete>
+
+    <delete id="deleteQuarterScoreByIds" parameterType="String">
+        delete from quarter_score where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

@@ -8,13 +8,16 @@ body.signin {
     -webkit-background-size: cover;
     -moz-background-size: cover;
     -o-background-size: cover;
-    background-size: cover
+    background-size: 80% 
 }
 
 .signinpanel {
-    width: 750px;
-    margin: 10% auto 0;
-    color: rgba(255, 255, 255, .95)
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 20px;
+    padding-left: 300px;
+    padding-top: 8%;
+    box-sizing: border-box;
 }
 
 .signinpanel .logopanel {
