@@ -89,6 +89,15 @@ public class QuarterController extends BaseController {
         mmap.put("type", type);
         mmap.put("canEdit", true);
 
+        SysUser currentUser = ShiroUtils.getSysUser();
+        List<SysPost> userPosts = postService.selectPostsByUserId(currentUser.getUserId());
+        String userPostName = userPosts.stream()
+                .filter(SysPost::isFlag)
+                .findFirst()
+                .map(SysPost::getPostName)
+                .orElse("");
+        mmap.put("userPostName", userPostName);
+
         return prefix + "/list";
     }
 
@@ -115,11 +124,11 @@ public class QuarterController extends BaseController {
         if (!currentUser.isAdmin()) {
             query.setCreateBy(currentUser.getLoginName()); // 非管理员只查自己的
         }
-        System.out.println("=== data:  currentUser=" + currentUser.getLoginName());
+        List<SysPost> userPosts = postService.selectPostsByUserId(currentUser.getUserId());
+        boolean isZoneLeader = userPosts.stream()
+                .filter(SysPost::isFlag)
+                .anyMatch(p -> p.getPostName() != null && p.getPostName().contains("分区领导"));
         List<QuarterScore> scores = quarterScoreService.selectQuarterScoreList(query);
-        // System.out.println("=== data: batchNo=" + batchNo + ", deptId=" + deptId + ",
-        // type=" + type + ", scores.size=" + scores.get(0).getScore());
-
         // 2. 查询该部门所有用户
         SysUser userQuery = new SysUser();
         if (deptId != null)
@@ -220,6 +229,7 @@ public class QuarterController extends BaseController {
     public AjaxResult save(@RequestBody Map<String, Object> params) {
         String batchNo = (String) params.get("batchNo");
         Object factorIdObj = params.get("factorId");
+        String type = (String) params.get("type");
         if (batchNo == null || factorIdObj == null) {
             return error("参数不完整");
         }
@@ -235,9 +245,12 @@ public class QuarterController extends BaseController {
                 .filter(g -> "好".equals(g.get("grade")))
                 .count();
 
-        if (goodCount > 1) {
+        var totalPeople = grades.size();
+        if (goodCount > 1 && "quarter".equals(type)) {
             // 直接返回错误，不执行保存
             return error("每个考察因素只能有一个人被评为“好”，当前有 " + goodCount + " 人");
+        } else if (goodCount > Math.max(1, Math.ceil(totalPeople * 0.35)) && "common".equals(type)) {
+            return error("每个考察因素只能35%被评为“好”");
         }
 
         // 3. 保存逻辑
@@ -268,7 +281,7 @@ public class QuarterController extends BaseController {
                 update.setUpdateBy(loginName);
                 quarterScoreService.updateQuarterScore(update);
             } else {
-                // 
+                //
                 QuarterScore insert = new QuarterScore();
                 insert.setUserId(userId);
                 insert.setFactorId(factorId);

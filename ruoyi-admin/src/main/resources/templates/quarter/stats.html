@@ -73,15 +73,16 @@
         var ctx = [[@{/}]];
         var batchNo = [[${ param.batchNo }]];
         var deptId = [[${ param.deptId != null ? param.deptId : '' }]];
+        var type = [[${param.type != null ? param.type : 'quarter'}]];
 
         $(function () {
             if (!batchNo) {
                 $("#statsBody").html('<tr><td colspan="5" class="text-center">缺少批次参数</td></tr>');
                 return;
             }
-            var params = { batchNo: batchNo };
+            var params = { batchNo: batchNo, type: type };
             if (deptId) params.deptId = deptId;
-             $.get(ctx + "quarter/stats", { batchNo: batchNo, deptId: deptId }, function(res) {
+             $.get(ctx + "quarter/stats", { batchNo: batchNo, deptId: deptId, type: type }, function(res) {
                 // batchNo: batchNo,
                 // deptId: deptId
                 if (res.code != 0) {

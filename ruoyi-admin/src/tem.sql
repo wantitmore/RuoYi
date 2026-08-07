@@ -327,10 +327,10 @@ CREATE TABLE quarter_factor (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 COMMENT='评价要素表';
 
-INSERT INTO quarter_factor (name, content, sort_order) VALUES
-('政治思想方面', '具体为：坚定理想信念、对党忠诚，遵守政治纪律和政治规矩；自觉增强“四个意识”、坚定“四个自信”、做到“两个维护”；自觉参加监狱党委各项政治学习与活动。', 1),
-('工作落实方面', '具体为围绕监狱中心工作，服务大局，科室、监区领导成员间团结协作；认真贯彻落实上级政策、精神，工作作风严谨，积极解决工作中重点、难点问题。带领的队伍有活力、凝聚力和战斗力。', 2),
-('组织纪律方面', '具体为：严格树立组织观念，遵守组织纪律，服从组织安排；遵守廉政规定，严守警囚关系底线；坚守忠诚老实、公道正派、实事求是、清正廉洁等价值观，遵守社会公德、职业道德、家庭美德。', 3);
+INSERT INTO quarter_factor (name, content, sort_order, type, create_by, create_time) VALUES
+('政治思想方面', '具体为：坚定理想信念、对党忠诚，遵守政治纪律和政治规矩；自觉增强“四个意识”、坚定“四个自信”、做到“两个维护”；自觉参加监狱党委各项政治学习与活动。', 1, 'quarter', 'admin', NOW()),
+('工作落实方面', '具体为围绕监狱中心工作，服务大局，科室、监区领导成员间团结协作；认真贯彻落实上级政策、精神，工作作风严谨，积极解决工作中重点、难点问题。带领的队伍有活力、凝聚力和战斗力。', 2, 'quarter', 'admin', NOW()),
+('组织纪律方面', '具体为：严格树立组织观念，遵守组织纪律，服从组织安排；遵守廉政规定，严守警囚关系底线；坚守忠诚老实、公道正派、实事求是、清正廉洁等价值观，遵守社会公德、职业道德、家庭美德。', 3, 'quarter', 'admin', NOW());
 
 --分区季度考核记录表
 CREATE TABLE quarter_score (
@@ -391,3 +391,112 @@ INSERT INTO assess_post_config (type, post_code, sort_order) VALUES
 ('common', '1qu_user', 1);
 ('common', '2qu_user', 2);
 ('common', 'sec', 3);
+
+--警员考核要素
+INSERT INTO quarter_factor (name, content, sort_order, type, create_by, create_time) VALUES 
+('政治思想方面', '具体为：坚定理想信念、对党忠诚，尊崇党章、遵守政治纪律和政治规矩；积极参加党支部政治学习和参与党支部各项活动。', 1, 'common', 'admin', NOW()),
+('工作落实方面', '具体为：工作作风严谨，严格执行制度、落实指令、履行岗位职责；敢于担当，遇事不推诿、不退避。', 2, 'common', 'admin', NOW()),
+('组织纪律方面', '具体为：严格树立组织观念，服从组织安排；遵守廉政规定，严守警囚关系底线，遵守社会公德、职业道德、家庭美德。', 3, 'common', 'admin', NOW());
+
+UPDATE sys_dict_data 
+SET dict_label = '负面清单', 
+    dict_value = '负面清单' 
+WHERE dict_type = 'kpi_category' 
+  AND dict_label = '其他履职事项';
+
+INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, remark, create_by, create_time)
+SELECT proj.name, proj.max_score, proj.score_type, d.dept_id, proj.category, '', 'admin', NOW()
+FROM sys_dept d
+CROSS JOIN (
+    SELECT '正面清单' AS name, 20 AS max_score, 'NUMBER' AS score_type, '其他履职事项' AS category
+    UNION ALL SELECT '负面清单', 20, 'NUMBER', '其他履职事项'
+    UNION ALL SELECT '问题通报', 20, 'NUMBER', '其他履职事项'
+) proj
+WHERE d.del_flag = '0'
+  AND NOT EXISTS (SELECT 1 FROM kpi_item existing WHERE existing.dept_id = d.dept_id AND existing.name = proj.name);
+
+
+INSERT INTO sys_dict_data (dict_sort, dict_label, dict_value, dict_type, css_class, list_class, is_default, status, create_by, create_time, update_by, update_time, remark)
+VALUES(12, '正面清单', '正面清单', 'kpi_category', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, NULL);
+
+-- ============================================================
+-- 第一步：将原来的 3 条记录改名（针对所有有效部门）
+-- ============================================================
+UPDATE kpi_item 
+SET name = '不积极履行岗位职责，未及时完成任务，尚未造成不良后果的'    
+WHERE name = '正面清单' 
+  AND category = '负面清单' 
+  AND dept_id IN (SELECT dept_id FROM sys_dept WHERE del_flag = '0');
+
+UPDATE kpi_item 
+SET name = '不积极工作，不主动作为，推诿扯皮，尚未造成不良后果的'    
+WHERE name = '负面清单' 
+  AND category = '负面清单' 
+  AND dept_id IN (SELECT dept_id FROM sys_dept WHERE del_flag = '0');
+
+UPDATE kpi_item 
+SET name = '完成工作任务质量不高、效果不佳的'    
+WHERE name = '问题通报' 
+  AND category = '负面清单' 
+  AND dept_id IN (SELECT dept_id FROM sys_dept WHERE del_flag = '0');
+
+UPDATE kpi_item 
+SET name = '分管工作在监狱以上检查、评比中受到批评，承担责任较轻的'    
+WHERE name = '其它未落实“两个职责”相关工作情形' 
+  AND category = '负面清单' 
+  AND dept_id IN (SELECT dept_id FROM sys_dept WHERE del_flag = '0');
+
+-- ============================================================
+-- 第二步：为每个有效部门新增 4 条记录（名称、分值、类型、分类请替换）
+-- ============================================================
+INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, remark, create_by, create_time)
+SELECT proj.name, proj.max_score, proj.score_type, d.dept_id, proj.category, '', 'admin', NOW()
+FROM sys_dept d
+CROSS JOIN (
+    -- 请将下面 4 条 UNION ALL 的占位值替换为实际数据
+    SELECT '警容不整、纪律作风松散，尚未造成不良影响的' AS name, 10 AS max_score, 'NUMBER' AS score_type, '负面清单' AS category
+    UNION ALL 
+    SELECT '违法规章制度，情节较轻的', 10, 'NUMBER', '负面清单'
+    UNION ALL 
+    SELECT '其他应给予批评的行为', 10, 'NUMBER', '负面清单'
+) proj
+WHERE d.del_flag = '0'
+  AND NOT EXISTS (
+      SELECT 1 FROM kpi_item existing 
+      WHERE existing.dept_id = d.dept_id 
+        AND existing.name = proj.name
+  );
+
+INSERT INTO kpi_item (name, max_score, score_type, dept_id, category, remark, create_by, create_time)
+SELECT proj.name, proj.max_score, proj.score_type, d.dept_id, proj.category, '', 'admin', NOW()
+FROM sys_dept d
+CROSS JOIN ( 
+    SELECT '积极履行岗位职责，出色完成工作任务' AS name, 10 AS max_score, 'NUMBER' AS score_type, '正面清单' AS category
+    UNION ALL 
+    SELECT '听从指挥，服从安排，落实制度好，执行力强', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '在专项工作中表现较好，做出一定成绩', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '积极参与处置突发事件，表现较突出', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '在省厅、局检查中受到表扬', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '每教育转化一名重点罪犯或高度、极高度罪犯，或包干A类重点犯连续较长时间未出现问题', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '认真钻研业务，开展理论研究，推动工作创新，获得省局以上奖励', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '认真遵守社会公德、家庭美德，有好人好事行为，受到群众好评或表扬', 10, 'NUMBER', '正面清单'
+    UNION ALL 
+    SELECT '其他应给予肯定的行为', 10, 'NUMBER', '正面清单'
+) proj
+WHERE d.del_flag = '0'
+  AND NOT EXISTS (
+      SELECT 1 FROM kpi_item existing 
+      WHERE existing.dept_id = d.dept_id 
+        AND existing.name = proj.name
+  );
+
+
+
+
+

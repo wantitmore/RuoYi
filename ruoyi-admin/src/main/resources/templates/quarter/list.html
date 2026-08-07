@@ -55,7 +55,7 @@
                                             th:text="${dept.deptName}"></option>
                                     </select>
                                 </div>
-                                <div class="col-sm-3">
+                                <div class="col-sm-4">
                                     <button class="btn btn-primary" onclick="loadData()">
                                         <i class="fa fa-search"></i> 查询
                                     </button>
@@ -64,6 +64,10 @@
                                     </button>
                                     <button class="btn btn-info" onclick="showStats()">
                                         <i class="fa fa-bar-chart"></i> 统计结果
+                                    </button>
+                                    <button class="btn btn-warning" onclick="switchType()" id="switchBtn"
+                                        th:if="${userPostName != '分区领导'}">
+                                        <i class="fa fa-exchange"></i> <span id="typeLabel">切换</span>
                                     </button>
                                 </div>
                             </div>
@@ -86,6 +90,23 @@
         var ctx = [[@{/}]];
         var currentFactors = [];
         var canEdit = [[${ canEdit }]];
+        var currentType = 'common';
+        var typeLabelMap = {
+            'quarter': '分区领导考核',
+            'common': '普通员工考核'
+        };
+        function switchType() {
+            // 循环切换 quarter ↔ common
+            if (currentType === 'quarter') {
+                currentType = 'common';
+            } else {
+                currentType = 'quarter';
+            }
+            // 更新显示
+            $("#currentTypeLabel").text(typeLabelMap[currentType]);
+            // 重新加载数据
+            loadData();
+        }
 
         // 初始化季度下拉框（当前季度及前后各4个季度）
         $(function () {
@@ -109,12 +130,13 @@
             var batchNo = $("#batchNo").val();
             var deptId = $("#deptSelect").val();
             if (!batchNo) { alert("请选择季度"); return; }
-            var type = 'quarter';
+            var type = currentType;
             $.get(ctx + "quarter/data", { batchNo: batchNo, deptId: deptId, type: type }, function (res) {
                 if (res.code != 0) { alert("加载失败"); return; }
                 var factors = res.data.factors;
                 var rows = res.data.rows;
                 currentFactors = factors;
+
 
                 // 构建表头
                 var headHtml = '<tr><th>岗位</th><th>人员</th>';
@@ -126,6 +148,11 @@
                 headHtml += '<th>平均分</th></tr>';
                 $("#tableHead").html(headHtml);
 
+                rows.sort((a, b) => {
+                    var postA = a.postName || '';
+                    var postB = b.postName || '';
+                    return postA.localeCompare(postB, 'zh');
+                });
                 // 构建表体
                 var bodyHtml = '';
                 $.each(rows, function (i, row) {
@@ -156,9 +183,14 @@
             if (!canEdit) { alert("没有编辑权限"); return; }
             var batchNo = $("#batchNo").val();
             if (!batchNo) { alert("请选择季度"); return; }
+            var totalPeople = $("#tableBody tr").length;
             var factorGoodCount = {};  // 记录每个因素下“好”的数量
+            var type = currentType || 'common';  // quarter 或 common
+            var factorMap = {};
+            var hasError = false;
             $(".grade-select").each(function () {
                 var factorId = $(this).data('factor-id');
+                var userId = $(this).data('user-id');
                 var grade = $(this).val();
                 if (grade === '好') {
                     if (!factorGoodCount[factorId]) {
@@ -170,9 +202,20 @@
 
             // 检查是否有因素超过1个“好”
             for (var factorId in factorGoodCount) {
-                if (factorGoodCount[factorId] > 1) {
-                    alert(" 同一评价要素只能有一个人被评为“好");
-                    return;  // 终止保存
+
+                if (type === 'quarter') {
+                    // 监区领导考核：好 ≤ 1
+                    if (factorGoodCount[factorId] > 1) {
+                        alert("每个因素只能有1人评为“好”");
+                        return;
+                    }
+                } else if (type === 'common') {
+                    // 普通员工考核：好 ≤ 总人数 × 35%（向上取整，至少1人）
+                    var maxGood = Math.max(1, Math.ceil(totalPeople * 0.35));
+                    if (factorGoodCount[factorId] > maxGood) {
+                        alert("本次评分中“好”的比例不能超过35%（本次共评" + totalPeople + "人，最多允许" + maxGood + "个“好”），当前有" + factorGoodCount[factorId] + "个");
+                        return;
+                    }
                 }
             }
 
@@ -221,6 +264,7 @@
         function showStats() {
             var batchNo = $("#batchNo").val();
             var deptId = $("#deptSelect").val();
+            var type = currentType || 'common';
             if (!batchNo) {
                 alert("请选择季度");
                 return;
@@ -230,7 +274,7 @@
                 type: 2,
                 title: '季度考核统计结果',
                 area: ['850px', '600px'],
-                content: ctx + 'quarter/statsPage?batchNo=' + batchNo + '&deptId=' + deptId,
+                content: ctx + 'quarter/statsPage?batchNo=' + batchNo + '&deptId=' + deptId + '&type=' + type,
                 btn: ['关闭']
             });
         }
