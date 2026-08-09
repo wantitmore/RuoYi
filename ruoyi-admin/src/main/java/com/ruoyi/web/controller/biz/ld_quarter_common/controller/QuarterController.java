@@ -124,12 +124,14 @@ public class QuarterController extends BaseController {
         if (!currentUser.isAdmin()) {
             query.setCreateBy(currentUser.getLoginName()); // 非管理员只查自己的
         }
+        // 查询是否是分区领导
         List<SysPost> userPosts = postService.selectPostsByUserId(currentUser.getUserId());
         boolean isZoneLeader = userPosts.stream()
                 .filter(SysPost::isFlag)
-                .anyMatch(p -> p.getPostName() != null && p.getPostName().contains("分区领导"));
+                .anyMatch(p -> p.getPostCode() != null && p.getPostCode().contains("fq_leader"));
+
         List<QuarterScore> scores = quarterScoreService.selectQuarterScoreList(query);
-        // 2. 查询该部门所有用户
+        // . 查询该部门所有用户
         SysUser userQuery = new SysUser();
         if (deptId != null)
             userQuery.setDeptId(deptId);
@@ -137,6 +139,10 @@ public class QuarterController extends BaseController {
 
         // 3. 根据 type 决定需要过滤的岗位编码集合（固定岗位）
         List<String> targetPostCodes = assessPostConfigService.getPostCodesByType(type);
+        System.out.println("=== data: 目标岗位编码=" + targetPostCodes.size() + ", type=" + type);
+        for (String postCoode : targetPostCodes) {
+            System.out.println("=== data: 目标岗位编码=" + postCoode);
+        }
         if (targetPostCodes.isEmpty()) {
             // 如果该类型没有配置任何岗位，可以返回空数据或提示
             return success().put("data", Collections.emptyMap());
@@ -156,6 +162,25 @@ public class QuarterController extends BaseController {
                     .anyMatch(targetPostCodes::contains);
             if (hasTargetPost) {
                 filteredUsers.add(user);
+                System.out.println("=== data: 用户 " + user.getUserName() + " 拥有目标岗位，加入 filteredUsers");
+            }
+        }
+        if (isZoneLeader && "common".equals(type)) {
+            // 当前用户的分区（如 "一分区"）
+            String currentZone = extractZone(userPosts);
+            if (StringUtils.isNotEmpty(currentZone)) {
+                filteredUsers = filteredUsers.stream()
+                        .filter(user -> {
+                            List<SysPost> posts = postService.selectPostsByUserId(user.getUserId());
+                            String postName = posts.stream()
+                                    .filter(SysPost::isFlag)
+                                    .findFirst()
+                                    .map(SysPost::getPostName)
+                                    .orElse("");
+                            // 只保留同一分区的管教员
+                            return postName.contains(currentZone);
+                        })
+                        .collect(Collectors.toList());
             }
         }
 
@@ -311,6 +336,21 @@ public class QuarterController extends BaseController {
             default:
                 return 0;
         }
+    }
+
+    private String extractZone(List<SysPost> posts) {
+        String postName = posts.stream()
+                .filter(SysPost::isFlag)
+                .findFirst()
+                .map(SysPost::getPostName)
+                .orElse("");
+        if (postName.contains("一分区"))
+            return "一分区";
+        if (postName.contains("二分区"))
+            return "二分区";
+        if (postName.contains("三分区"))
+            return "三分区";
+        return "";
     }
 
     /**

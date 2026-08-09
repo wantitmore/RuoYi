@@ -385,6 +385,8 @@ CREATE TABLE assess_post_config (
 -- 分区领导季度考核需要哪些岗位
 INSERT INTO assess_post_config (type, post_code, sort_order) VALUES 
 ('quarter', 'fq_leader', 1),   -- 分区领导
+('quarter', '1fq_leader', 2),   -- 分区领导
+('quarter', '2fq_leader', 3),   -- 分区领导        -- 分区领导
 
 -- 普通警员考核需要哪些岗位
 INSERT INTO assess_post_config (type, post_code, sort_order) VALUES 
