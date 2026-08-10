@@ -1,51 +1,78 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.web.controller.biz.sixcheck.mapper.SixCheckRecordMapper">
     
     <resultMap type="SixCheckRecord" id="SixCheckRecordResult">
-        <result property="id"    column="id"    />
-        <result property="itemId"    column="item_id"    />
-        <result property="recordValue"    column="record_value"    />
-        <result property="batchNo"    column="batch_no"    />
-        <result property="createBy"    column="create_by"    />
-        <result property="createTime"    column="create_time"    />
-        <result property="updateBy"    column="update_by"    />
-        <result property="updateTime"    column="update_time"    />
-        <result property="dutyLeader" column="duty_leader"/>
-        <result property="checkDate" column="check_date"/>
-        <result property="shift" column="shift"/>
+        <result property="id" column="id" />
+        <result property="itemId" column="item_id" />
+        <result property="recordValue" column="record_value" />
+        <result property="batchNo" column="batch_no" />
+        <result property="deptId" column="dept_id" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="dutyLeader" column="duty_leader" />
+        <result property="checkDate" column="check_date" />
+        <result property="shift" column="shift" />
+        <!-- 新增：关联的KPI记录ID -->
+        <result property="kpiScoreId" column="kpi_score_id" />
     </resultMap>
 
+    <!-- 公共SELECT列（不包含FROM和JOIN） -->
     <sql id="selectSixCheckRecordVo">
-        select id, item_id, record_value, batch_no, dept_id, create_by, create_time, check_date, shift, duty_leader,update_by, update_time from six_check_record
+        select 
+            s.id, 
+            s.item_id, 
+            s.record_value, 
+            s.batch_no, 
+            s.dept_id, 
+            s.create_by, 
+            s.create_time, 
+            s.check_date, 
+            s.shift, 
+            s.duty_leader,
+            s.update_by, 
+            s.update_time,
+            k.id AS kpi_score_id
     </sql>
 
+    <!-- 列表查询（带条件） -->
     <select id="selectSixCheckRecordList" parameterType="SixCheckRecord" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
-        <trim prefix="WHERE" prefixOverrides="AND |OR ">
-            <if test="itemId != null">AND item_id = #{itemId}</if>
-            <if test="recordValue != null and recordValue != ''">AND record_value = #{recordValue}</if>
-            <if test="batchNo != null and batchNo != ''">AND batch_no = #{batchNo}</if>
-            <if test="deptId != null">AND dept_id = #{deptId}</if>
-            <if test="checkDate != null">AND DATE(check_date) = #{checkDate, jdbcType=DATE}</if>
-            <if test="shift != null and shift != ''">AND shift = #{shift}</if>
-            <if test="dutyLeader != null and dutyLeader != ''">AND duty_leader = #{dutyLeader}</if>
-        </trim>
+        from six_check_record s
+        LEFT JOIN kpi_score k ON k.source_record_id = s.id
+        <where>
+            <if test="itemId != null">AND s.item_id = #{itemId}</if>
+            <if test="recordValue != null and recordValue != ''">AND s.record_value = #{recordValue}</if>
+            <if test="batchNo != null and batchNo != ''">AND s.batch_no = #{batchNo}</if>
+            <if test="deptId != null">AND s.dept_id = #{deptId}</if>
+            <if test="checkDate != null">AND DATE(s.check_date) = #{checkDate, jdbcType=DATE}</if>
+            <if test="shift != null and shift != ''">AND s.shift = #{shift}</if>
+            <if test="dutyLeader != null and dutyLeader != ''">AND s.duty_leader = #{dutyLeader}</if>
+        </where>
     </select>
-    
+
+    <!-- 根据ID查询 -->
     <select id="selectSixCheckRecordById" parameterType="Long" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
-        where id = #{id}
+        from six_check_record s
+        LEFT JOIN kpi_score k ON k.source_record_id = s.id
+        where s.id = #{id}
     </select>
 
+    <!-- 按月查询 -->
     <select id="selectListByMonth" resultMap="SixCheckRecordResult">
-        SELECT * FROM six_check_record
-        WHERE DATE_FORMAT(check_date, '%Y-%m') = #{month}
-        <if test="deptId != null">AND dept_id = #{deptId}</if>
+        <include refid="selectSixCheckRecordVo"/>
+        from six_check_record s
+        LEFT JOIN kpi_score k ON k.source_record_id = s.id
+        <where>
+            DATE_FORMAT(s.check_date, '%Y-%m') = #{month}
+            <if test="deptId != null">AND s.dept_id = #{deptId}</if>
+        </where>
     </select>
 
+    <!-- 插入（不变） -->
     <insert id="insertSixCheckRecord" parameterType="SixCheckRecord" useGeneratedKeys="true" keyProperty="id">
         insert into six_check_record
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -72,17 +99,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </trim>
     </insert>
 
+    <!-- 更新（不变） -->
     <update id="updateSixCheckRecord" parameterType="SixCheckRecord">
         update six_check_record
         <trim prefix="SET" suffixOverrides=",">
             <if test="itemId != null">item_id = #{itemId},</if>
             <if test="recordValue != null">record_value = #{recordValue},</if>
             <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
+            <if test="deptId != null">dept_id = #{deptId},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
-            <if test="batchNo != null and batchNo != ''">batch_no = #{batchNo},</if>
             <if test="checkDate != null">check_date = #{checkDate},</if>
             <if test="shift != null and shift != ''">shift = #{shift},</if>
             <if test="dutyLeader != null and dutyLeader != ''">duty_leader = #{dutyLeader},</if>
@@ -90,6 +118,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{id}
     </update>
 
+    <!-- 删除（不变） -->
     <delete id="deleteSixCheckRecordById" parameterType="Long">
         delete from six_check_record where id = #{id}
     </delete>

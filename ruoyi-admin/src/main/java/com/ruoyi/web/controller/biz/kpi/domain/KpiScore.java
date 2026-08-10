@@ -39,6 +39,23 @@ public class KpiScore extends BaseEntity {
     @Excel(name = "考核批次", readConverterExp = "如=2024-Q4，可用于区分不同期次")
     private String batchNo;
 
+
+    private Long sourceRecordId;
+
+    public static long getSerialversionuid() {
+        return serialVersionUID;
+    }
+
+    public Long getSourceRecordId() {
+        return sourceRecordId;
+    }
+
+    public void setSourceRecordId(Long sourceRecordId) {
+        this.sourceRecordId = sourceRecordId;
+    }
+
+
+
     /**
      *
      */

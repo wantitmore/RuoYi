@@ -36,6 +36,15 @@ public class SixCheckRecord extends BaseEntity {
     private Date checkDate; // 值班日期
     private String shift; // 值班班次
     private String dutyLeader; // 值班领导
+    private Long kpiScoreId;
+
+    public Long getKpiScoreId() {
+        return kpiScoreId;
+    }
+
+    public void setKpiScoreId(Long kpiScoreId) {
+        this.kpiScoreId = kpiScoreId;
+    }
 
     // getter/setter
     public Date getCheckDate() {

@@ -497,6 +497,10 @@ WHERE d.del_flag = '0'
       WHERE existing.dept_id = d.dept_id 
         AND existing.name = proj.name
   );
+--- 为 kpi_score 表增加 source_record_id 字段，用于关联六必查记录
+ALTER TABLE kpi_score ADD COLUMN source_record_id bigint(20) DEFAULT NULL COMMENT '来源记录ID（关联六必查记录）';
+ALTER TABLE kpi_score ADD INDEX idx_source_record (source_record_id);
+
 
 
 

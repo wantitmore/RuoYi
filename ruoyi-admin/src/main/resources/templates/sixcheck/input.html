@@ -70,7 +70,7 @@
     </div>
     <div th:include="include :: footer"></div>
     <!-- <script th:src="@{/js/commonDeduct.js}"></script> -->
-    <script th:inline="javascript" >
+    <script th:inline="javascript">
         var ctx = [[@{/}]];
         var canEdit = [[${ canEdit }]];
 
@@ -85,7 +85,7 @@
             });
         });
 
-        function loadData(lastKpiScoreId) {
+        function loadData() {
             var checkDate = $("#checkDate").val();
             var shift = $("#shift").val();
             if (!checkDate || !shift) { alert("请选择值班日期和班次"); return; }
@@ -93,6 +93,7 @@
                 if (res.code != 0) { alert("加载失败"); return; }
                 var items = res.data.items;
                 var records = res.data.records;
+                var kpiScoreMap = res.data.kpiScoreMap || {};
                 var dutyLeader = res.data.dutyLeader || '';
                 if (dutyLeader) {
                     $("#dutyLeader").val(dutyLeader);
@@ -119,13 +120,16 @@
 
                     // 撤销按钮
                     var deductPattern = /（关联加扣分-[^）]+）/g;
+
                     var deductMatches = recordValue.match(deductPattern);
                     if (deductMatches && deductMatches.length > 0) {
                         var lastDeduct = deductMatches[deductMatches.length - 1];  // ★ 定义 lastDeduct
+                        var kpiScoreId = kpiScoreMap[item.id] || '';
                         var kpiItemIdToDelete = window._lastDeductKpiItemId || '';
-                        console.log("撤销扣分按钮：lastDeduct=" + lastDeduct + ", kpiItemIdToDelete=" + kpiItemIdToDelete + ", lastKpiScoreId=" + lastKpiScoreId);
-                        var scoreIdToDelete = lastKpiScoreId || '';
-                        html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\', \'' + scoreIdToDelete + '\', \'' + kpiItemIdToDelete + '\')">撤销</button></td>';
+                        console.log("撤销扣分按钮：lastDeduct=" + lastDeduct + ", kpiItemIdToDelete=" + kpiItemIdToDelete + ", kpiScoreId=" + kpiScoreId);
+                        // var scoreIdToDelete = lastKpiScoreId || '';
+                        // html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\', \'' + scoreIdToDelete + '\', \'' + kpiItemIdToDelete + '\')">撤销</button></td>';
+                        html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + lastDeduct.replace(/'/g, "\\'") + '\', ' + kpiScoreId + ', ' + item.id + ')">撤销</button></td>';
                     }
                     html += '</tr>';
                 }
@@ -137,42 +141,60 @@
                 }
             });
         }
-        function cancelDeduct(itemId, deductInfo, kpiScoreId, kpiItemId) {
-            var requestData = {
-                itemId: itemId,
-                checkDate: $("#checkDate").val(),
-                shift: $("#shift").val(),
-                deductInfo: deductInfo,
-                kpiScoreId: kpiScoreId,
-                kpiItemId: kpiItemId || null
-            };
-            if (kpiScoreId) requestData.kpiScoreId = kpiScoreId;
-            if (kpiItemId) requestData.kpiItemId = kpiItemId;
-            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) return;
-
-            console.log("撤销扣分请求数据:kpiScoreId", requestData.kpiScoreId);
-            // 如果有精确的 kpi_score ID，就传过去；否则后端用文本匹配降级
-            if (kpiScoreId) {
-                requestData.kpiScoreId = kpiScoreId;
+        function cancelDeduct(deductInfo, kpiScoreId, itemId) {
+            if (!kpiScoreId) {
+                alert("参数错误：缺少kpiScoreId");
+                return;
+            }
+            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) {
+                return;
             }
 
             $.ajax({
                 url: ctx + "sixcheck/record/cancelDeduct",
                 type: "POST",
                 contentType: "application/json",
-                data: JSON.stringify(requestData),
+                data: JSON.stringify({
+                    kpiScoreId: kpiScoreId,
+                    deductInfo: deductInfo
+                }),
                 success: function (res) {
                     if (res.code == 0) {
                         alert("撤销成功");
-                        loadData(); // 刷新表格（不带 ID）
+
+                        // ========== 通过 itemId 定位 textarea ==========
+                        var textarea = $('textarea[data-item-id="' + itemId + '"]');
+                        if (textarea.length > 0) {
+                            var currentValue = textarea.val() || '';
+                            var lines = currentValue.split('\n');
+                            var newLines = [];
+                            for (var i = 0; i < lines.length; i++) {
+                                if (lines[i].trim().indexOf(deductInfo.trim()) !== -1) {
+                                    continue;  // 跳过匹配的行
+                                }
+                                if (lines[i].trim()) {
+                                    newLines.push(lines[i]);
+                                }
+                            }
+                            var newValue = newLines.join('\n').trim();
+                            if (!newValue) {
+                                newValue = '正常';
+                            }
+                            textarea.val(newValue);
+                            saveData(true);
+
+                        }
+
                     } else {
                         alert("操作失败：" + res.msg);
                     }
+                },
+                error: function (xhr) {
+                    alert("请求失败：" + xhr.status);
                 }
             });
         }
-
-        function saveData() {
+        function saveData(silent) {
             var checkDate = $("#checkDate").val();
             var shift = $("#shift").val();
             var dutyLeader = $("#dutyLeader").val();
@@ -204,9 +226,13 @@
                     recordList: recordList
                 }),
                 success: function (res) {
-                    if (res.code == 0) alert("保存成功！");
+                    if (res.code == 0) {
+                        if (!silent) {
+                            alert("保存成功！");
+                        }
+                    } 
                     else alert("保存失败：" + res.msg);
-                }
+            }
             });
         }
 
@@ -306,8 +332,9 @@
                                     }
                                     var kpiScoreId = res.data ? res.data.kpiScoreId : res.kpiScoreId;;
                                     //window._lastDeductKpiItemId = kpiItemId; // 在 yes 回调中设置
-                                    console.log("加扣分成功，kpiScoreId=" + kpiScoreId + ", res.kpiScoreId = " +  res.kpiScoreId);
-                                    loadData(kpiScoreId);
+                                    console.log("加扣分成功，kpiScoreId=" + kpiScoreId + ", res.kpiScoreId = " + res.kpiScoreId);
+                                    // loadData(kpiScoreId);
+                                    
                                 } else {
                                     alert("操作失败：" + res.msg);
                                 }
@@ -336,7 +363,7 @@
             });
         }
         // 类别切换时过滤项目
-        $("#deductCategory").on('change', function () {
+       /*  $("#deductCategory").on('change', function () {
             var cat = $(this).val();
             var html = '<option value="">请选择项目</option>';
             if (cat) {
@@ -347,7 +374,7 @@
                 });
             }
             $("#deductItemId").html(html);
-        });
+        }); */
 
     </script>
 </body>
