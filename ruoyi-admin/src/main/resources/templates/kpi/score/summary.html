@@ -143,6 +143,10 @@
             function search() {
                 var startMonth = document.getElementById("startMonth").value;
                 var endMonth = document.getElementById("endMonth").value;
+                var el = document.getElementById("startMonth");
+                console.log(el);                    // 查看元素本身
+                console.log(typeof el.value);       // 打印 value 的类型
+                console.log(el.value);              // 打印 value 的值
                 var deptIdEl;
                 var postId;
                 if (!isAdmin) {
@@ -198,6 +202,8 @@
                     .catch(err => alert("请求失败：" + err.message));
             }
             function exportExcel() {
+                var startMonth = document.getElementById("startMonth").value;
+                var endMonth = document.getElementById("endMonth").value;
                 var deptId = document.getElementById("deptSelect").value;
                 var postId = document.getElementById("postSelect").value;   // 新增：获取岗位
                 if (!startMonth || !endMonth) {

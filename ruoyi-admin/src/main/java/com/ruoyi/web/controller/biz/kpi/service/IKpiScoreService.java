@@ -22,7 +22,7 @@ public interface IKpiScoreService
      */
     public KpiScore selectKpiScoreById(Long id);
 
-    List<ScoreSummary> selectSummary(String batchNo, Long deptId, Long postId);
+    // List<ScoreSummary> selectSummary(String batchNo, Long deptId, Long postId);
 
     /**
      * 查询考核分数列表
@@ -67,7 +67,7 @@ public interface IKpiScoreService
     void deleteByUserAndRemark(String userName, String remark, String checkDate, Long deptId);
 
      List<ScoreSummary> selectAvgSummary(List<String> months, Long deptId,
-                    Long batchNo);
+                    Long postId);
 
     List<KpiScore> selectByMonths(Long userId, List<String> months);
 }

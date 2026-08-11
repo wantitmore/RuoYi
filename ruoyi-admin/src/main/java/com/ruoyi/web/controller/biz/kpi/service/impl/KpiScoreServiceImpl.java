@@ -25,11 +25,11 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
     @Autowired
     private KpiScoreMapper kpiScoreMapper;
 
-    @Override
+/*     @Override
     public List<ScoreSummary> selectSummary(String batchNo, Long deptId, Long postId) {
         return kpiScoreMapper.selectSummary(batchNo, deptId, postId);
     }
-
+ */
     /**
      * 查询考核分数
      * 

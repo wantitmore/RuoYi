@@ -341,18 +341,24 @@ public class KpiScoreController extends BaseController {
     }
 
     // 返回 JSON 数据的方法（访问地址：/kpi/score/summary/data）
-    @GetMapping("/summary/data")
-    @ResponseBody
-    public AjaxResult summaryData(@RequestParam String batchNo,
-            @RequestParam(required = false) Long deptId,
-            @RequestParam(required = false) Long postId) {
-        SysUser user = ShiroUtils.getSysUser();
-        if (!user.isAdmin()) {
-            deptId = user.getDeptId();
-        }
-        List<ScoreSummary> list = kpiScoreService.selectSummary(batchNo, deptId, postId);
-        return success().put("data", list);
-    }
+    /*
+     * @GetMapping("/summary/data")
+     * 
+     * @ResponseBody
+     * public AjaxResult summaryData(@RequestParam String batchNo,
+     * 
+     * @RequestParam(required = false) Long deptId,
+     * 
+     * @RequestParam(required = false) Long postId) {
+     * SysUser user = ShiroUtils.getSysUser();
+     * if (!user.isAdmin()) {
+     * deptId = user.getDeptId();
+     * }
+     * List<ScoreSummary> list = kpiScoreService.selectAvgSummary(batchNo, deptId,
+     * postId);
+     * return success().put("data", list);
+     * }
+     */
 
     @GetMapping("/personDetail")
     @ResponseBody
@@ -502,16 +508,19 @@ public class KpiScoreController extends BaseController {
     @GetMapping("/summary/export")
     @ResponseBody
     public void exportSummary(HttpServletResponse response,
-            @RequestParam String batchNo,
+            @RequestParam String startMonth,
+            @RequestParam String endMonth,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Long postId) { // 新增 postId
-        List<ScoreSummary> list = kpiScoreService.selectSummary(batchNo, deptId, postId);
+        List<String> months = getMonthsBetween(startMonth, endMonth);
+        List<ScoreSummary> list = kpiScoreService.selectAvgSummary(months, deptId, postId);
+        System.out.println("months " + months + ", postId is " + postId);
         for (int i = 0; i < list.size(); i++) {
             list.get(i).setRank(i + 1);
-            list.get(i).setTotalScore(list.get(i).getTotalScore() + 100);
+            list.get(i).setTotalScore(list.get(i).getTotalScore());
         }
         ExcelUtil<ScoreSummary> util = new ExcelUtil<>(ScoreSummary.class);
-        util.exportExcel(response, list, "考核结果_" + batchNo);
+        util.exportExcel(response, list, "考核结果");
     }
 
     @GetMapping("/summary/avg")
@@ -534,6 +543,7 @@ public class KpiScoreController extends BaseController {
         for (int i = 0; i < list.size(); i++) {
             list.get(i).setRank(i + 1);
             // totalScore 存储的是平均分，保留两位小数
+            System.out.println("list.get(i).getTotalScore() " + list.get(i).getTotalScore());
             list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
         }
         return success().put("data", list);
@@ -542,6 +552,7 @@ public class KpiScoreController extends BaseController {
     // 辅助方法：生成区间月份列表
     private List<String> getMonthsBetween(String start, String end) {
         List<String> months = new ArrayList<>();
+        System.out.println("start " + start + ", end " + end);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM");
             Calendar cal = Calendar.getInstance();
