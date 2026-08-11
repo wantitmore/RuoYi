@@ -26,6 +26,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.web.controller.biz.common.service.CommonDeductService;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
 import com.ruoyi.web.controller.biz.video.domain.VideoCheckItem;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
 import com.ruoyi.web.controller.biz.video.service.IVideoCheckItemService;
@@ -43,6 +45,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
     @Autowired
     private CommonDeductService commonDeductService;
+
+    @Autowired
+    private IKpiScoreService kpiScoreService;
 
     private String prefix = "video/record";
 
@@ -65,8 +70,6 @@ public class VideoPlaybackRecordController extends BaseController {
         return getDataTable(list);
     }
 
-    
-
     // ==================== 录入页（菜单 url: video/record/input）====================
     @GetMapping("/input")
     public String input(ModelMap mmap) {
@@ -78,6 +81,7 @@ public class VideoPlaybackRecordController extends BaseController {
     @GetMapping("/load")
     @ResponseBody
     public AjaxResult load(@RequestParam String batchNo) {
+        System.out.println("load batchNo : " + batchNo);
         VideoCheckItem queryItem = new VideoCheckItem();
         queryItem.setDeptId(ShiroUtils.getSysUser().getDeptId());
         List<VideoCheckItem> items = videoCheckItemService.selectVideoCheckItemList(queryItem);
@@ -93,9 +97,24 @@ public class VideoPlaybackRecordController extends BaseController {
             recordMap.put(r.getItemId(), r.getPlaybackStatus());
         }
 
+        Map<Long, Long> kpiScoreMap = new HashMap<>();
+        for (VideoPlaybackRecord r : records) {
+            String status = r.getPlaybackStatus();
+            if (status != null && status.contains("关联加扣分")) {
+                KpiScore scoreQuery = new KpiScore();
+                scoreQuery.setSourceRecordId(r.getId());
+                scoreQuery.setBatchNo(batchNo);
+                List<KpiScore> scoreList = kpiScoreService.selectKpiScoreList(scoreQuery);
+                if (!scoreList.isEmpty()) {
+                    kpiScoreMap.put(r.getItemId(), scoreList.get(0).getId());
+                }
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("items", items);
         result.put("records", recordMap);
+        result.put("kpiScoreMap", kpiScoreMap);
         return success().put("data", result);
     }
 
@@ -123,39 +142,52 @@ public class VideoPlaybackRecordController extends BaseController {
         return success("保存成功");
     }
 
-    @RequiresPermissions("video:record:edit")
     @PostMapping("/cancelDeduct")
     @ResponseBody
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
-        Long itemId = Long.valueOf(params.get("itemId").toString());
-        // String videoDate = params.get("videoDate").toString();
+        Long kpiScoreId = Long.valueOf(params.get("kpiScoreId").toString());
         String deductInfo = params.get("deductInfo").toString();
-        Long deptId = ShiroUtils.getSysUser().getDeptId();
+        System.out.println("=== 撤销收到的 kpiScoreId = " + kpiScoreId);
 
-        // 1. 更新视频回放记录
-        VideoPlaybackRecord query = new VideoPlaybackRecord();
-        query.setItemId(itemId);
-        // query.setBatchNo(videoDate.substring(0, 7));
-        query.setDeptId(deptId);
-        List<VideoPlaybackRecord> records = videoPlaybackRecordService.selectVideoPlaybackRecordList(query);
-        if (!records.isEmpty()) {
-            VideoPlaybackRecord exist = records.get(0);
-            exist.setPlaybackStatus(commonDeductService.removeDeductDesc(exist.getPlaybackStatus(), deductInfo));
-            exist.setUpdateBy(ShiroUtils.getLoginName());
-            videoPlaybackRecordService.updateVideoPlaybackRecord(exist);
+        // 1. 查询 KPI 记录
+        KpiScore kpiScore = kpiScoreService.selectKpiScoreById(kpiScoreId);
+        if (kpiScore == null) {
+            return error("未找到考核记录");
         }
 
-        // 2. 更新考核打分记录
-        String userName = commonDeductService.parseUserName(deductInfo);
+        // 2. 通过 source_record_id 定位视频回放记录
+        Long videoRecordId = kpiScore.getSourceRecordId();
+        System.out.println("kpiScore " + kpiScore.toString());
+        if (videoRecordId != null) {
+            VideoPlaybackRecord videoRecord = videoPlaybackRecordService.selectVideoPlaybackRecordById(videoRecordId);
+            if (videoRecord != null) {
+                String newStatus = commonDeductService.removeDeductDesc(videoRecord.getPlaybackStatus(), deductInfo);
+                videoRecord.setPlaybackStatus(newStatus);
+                videoRecord.setUpdateBy(ShiroUtils.getLoginName());
+                videoPlaybackRecordService.updateVideoPlaybackRecord(videoRecord);
+            }
+        } else {
+            // 降级方案：按 itemId + batchNo 匹配（兼容旧数据）
+            // 但建议尽量保证 source_record_id 不为空
+            return error("未关联视频记录，无法撤销");
+        }
+
+        // 3. 恢复 KPI 分数
         BigDecimal scoreChange = commonDeductService.parseScoreChange(deductInfo);
-        // String batchNo = videoDate.substring(0, 7);
-        commonDeductService.updateKpiScoreByDeduct(userName, null, deductInfo,
-                scoreChange != null ? scoreChange.negate() : null);
+        if (scoreChange != null) {
+            kpiScore.setScore(kpiScore.getScore().subtract(scoreChange)); // 反向操作
+            kpiScore.setUpdateBy(ShiroUtils.getLoginName());
+            kpiScoreService.updateKpiScore(kpiScore);
+        }
+
+        // 4. 从 KPI 备注中移除扣分描述
+        String newRemark = commonDeductService.removeDeductDesc(kpiScore.getRemark(), deductInfo);
+        kpiScore.setRemark(newRemark);
+        kpiScoreService.updateKpiScore(kpiScore);
 
         return success("撤销成功");
     }
-
     // ==================== 以下为生成器自动生成的 CRUD 方法（请保持原有代码不变）====================
 
     /**

@@ -75,6 +75,7 @@
                 if (res.code != 0) { alert("加载失败"); return; }
                 var items = res.data.items;
                 var records = res.data.records;
+                var kpiScoreMap = res.data.kpiScoreMap || {};
                 var html = '';
                 var readonlyAttr = canEdit ? '' : 'readonly';
                 for (var i = 0; i < items.length; i++) {
@@ -86,17 +87,20 @@
                     html += '<td>' + item.specificContent + '</td>';
                     html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3" ' + readonlyAttr + '>' + recordValue + '</textarea></td>';
                     if (canEdit) {
-                        html += '<td><button class="btn btn-xs btn-warning" ' +
+/*                         html += '<td><button class="btn btn-xs btn-warning" ' +
                             'onclick="openDeductModal(\'' + item.name + '\', \'' + ($("#dutyLeader").val() || '') + '\', \'' + item.id + '\')">' +
-                            '<i class="fa fa-minus-circle"></i> 关联加扣分</button></td>';
+                            '<i class="fa fa-minus-circle"></i> 关联加扣分</button></td>'; */
+                        html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', ' + item.id + ')">关联加扣分</button></td>';
                     }
                     var deductPattern = /（关联加扣分-[^）]+）/g;
                     var deductMatches = recordValue.match(deductPattern);
                     if (deductMatches && deductMatches.length > 0) {
                         var lastDeduct = deductMatches[deductMatches.length - 1];
-                        html += '<td><button class="btn btn-xs btn-danger" ' +
-                            'onclick="cancelDeduct(\'' + item.id + '\', \'' + lastDeduct.replace(/'/g, "\\'") + '\')">' +
-                            '<i class="fa fa-undo"></i> 撤销</button></td>';
+                        var kpiScoreId = kpiScoreMap[item.id] || '';
+                        console.log('kpiScoreId:', kpiScoreId);
+                        if (kpiScoreId) {
+                            html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + lastDeduct.replace(/'/g, "\\'") + '\', ' + kpiScoreId + ', ' + item.id + ')">撤销</button></td>';
+                        }
                     }
                     html += '</tr>';
                 }
@@ -108,9 +112,10 @@
             });
         }
 
-        function saveData() {
+        function saveData(silent) {
             var batchNo = $("#batchNo").val();
             if (!batchNo) { alert("请选择月份"); return; }
+
             var recordList = [];
             $("#tableBody textarea").each(function () {
                 var itemId = $(this).data('item-id');
@@ -118,26 +123,41 @@
                 if (value && value.trim() !== '') {
                     recordList.push({
                         itemId: itemId,
-                        playbackStatus: value,
-                        batchNo: batchNo
+                        batchNo: batchNo,
+                        playbackStatus: value
                     });
                 }
             });
             if (recordList.length === 0) { alert("没有可保存的记录"); return; }
+
             $.ajax({
                 url: ctx + "video/record/save",
                 type: "POST",
                 contentType: "application/json",
                 data: JSON.stringify(recordList),
                 success: function (res) {
-                    if (res.code == 0) alert("保存成功！");
-                    else alert("保存失败：" + res.msg);
+                    if (res.code == 0) {
+                        if (!silent) {
+                            alert("保存成功！");
+                        }
+                    } else {
+                        alert("保存失败：" + res.msg);
+                    }
                 }
             });
         }
-        function openDeductModal(checkItemName, defaultUserName, videoItemId) {
+        function openDeductModal(checkItemName, videoItemId) {
             var deptId = [[${ currentDeptId }]];
-            if (!deptId) { alert("无法获取部门信息"); return; }
+            if (!deptId) {
+                alert("无法获取部门信息");
+                return;
+            }
+
+            window._currentDeductInfo = {
+                videoItemId: videoItemId,
+                batchNo: $("#batchNo").val(),
+                currentValue: $("#tableBody textarea[data-item-id='" + videoItemId + "']").val() || '正常'
+            };
 
             $.when(
                 $.get(ctx + "kpi/score/getUsersByDept?deptId=" + deptId),
@@ -148,8 +168,7 @@
 
                 var userOptions = '<option value="">请选择</option>';
                 $.each(users, function (i, u) {
-                    var selected = (u.userName === defaultUserName) ? ' selected' : '';
-                    userOptions += '<option value="' + u.userId + '"' + selected + '>' + u.userName + '</option>';
+                    userOptions += '<option value="' + u.userId + '">' + u.userName + '</option>';
                 });
 
                 var categories = [];
@@ -168,13 +187,13 @@
                     '<div class="form-group"><label class="col-sm-3 control-label">被考核人：</label><div class="col-sm-8"><select id="deductUserId" class="form-control">' + userOptions + '</select></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">考核类别：</label><div class="col-sm-8"><select id="deductCategory" class="form-control">' + catOptions + '</select></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">考核项目：</label><div class="col-sm-8"><select id="deductItemId" class="form-control"><option value="">请先选择类别</option></select></div></div>' +
-                    '<div class="form-group"><label class="col-sm-3 control-label">分数：</label><div class="col-sm-8"><input type="number" id="deductScore" class="form-control" step="0.5" min="0" /></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">分数：</label><div class="col-sm-8"><input type="number" id="deductScore" class="form-control" step="0.5" min="-10" max="10" /></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">备注：</label><div class="col-sm-8"><textarea id="deductRemark" class="form-control" rows="2"></textarea></div></div>' +
                     '</form></div>';
 
                 layer.open({
                     type: 1,
-                    title: '关联加扣分',
+                    title: '关联加扣分 - ' + checkItemName,
                     shadeClose: false,
                     shade: 0.3,
                     area: ['550px', '400px'],
@@ -185,7 +204,11 @@
                         var itemId = $(layero).find('#deductItemId').val();
                         var score = $(layero).find('#deductScore').val();
                         var remark = $(layero).find('#deductRemark').val();
-                        if (!userId || !itemId || !score) { alert("请填写完整信息"); return; }
+                        if (!userId || !itemId || !score) {
+                            alert("请填写完整信息");
+                            return;
+                        }
+
                         $.ajax({
                             url: ctx + "kpi/score/videoQuickDeduct",
                             type: "POST",
@@ -195,21 +218,38 @@
                                 itemId: itemId,
                                 score: parseFloat(score),
                                 remark: remark,
-                                videoItemId: videoItemId,
-                                videoDate: $("#checkDate").val()
+                                videoItemId: window._currentDeductInfo.videoItemId,
+                                videoDate: window._currentDeductInfo.batchNo,
+                                checkDate: window._currentDeductInfo.batchNo + '-01'
                             }),
                             success: function (res) {
+                                console.log('完整响应:', res);
                                 if (res.code == 0) {
-                                    alert("扣分成功！");
+                                    alert("加扣分成功！");
                                     layer.close(index);
-                                    loadData();
+                                    // 更新 textarea（如果有 finalValue）
+                                    if (res.data && res.data.finalValue) {
+                                        var textarea = $('textarea[data-item-id="' + window._currentDeductInfo.videoItemId + '"]');
+                                        if (textarea.length > 0) {
+                                            textarea.val(res.data.finalValue);
+                                        }
+                                    }
+
+                                    // 2. 获取 kpiScoreId 并更新 kpiScoreMap（可选）
+                                    var kpiScoreId = res.data ? res.data.kpiScoreId : null;
+                                    console.log("加扣分成功，kpiScoreId=" + kpiScoreId);
+
+                                    // 3. 不刷新页面，避免丢失未保存内容
+
                                 } else {
                                     alert("操作失败：" + res.msg);
                                 }
                             }
                         });
                     },
-                    btn2: function (index) { layer.close(index); },
+                    btn2: function (index) {
+                        layer.close(index);
+                    },
                     success: function (layero, index) {
                         $(layero).find('#deductCategory').on('change', function () {
                             var cat = $(this).val();
@@ -218,7 +258,7 @@
                             if (cat) {
                                 $.each(items, function (i, item) {
                                     if (item.category === cat) {
-                                        html += '<option value="' + item.id + '">' + item.name + '</option>';
+                                        html += '<option value="' + item.id + '">' + item.name + ' </option>';
                                     }
                                 });
                             }
@@ -230,24 +270,57 @@
         }
 
         // 撤销关联扣分
-        function cancelDeduct(videoItemId, deductInfo) {
-            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) return;
+        function cancelDeduct(deductInfo, kpiScoreId, itemId) {
+            if (!kpiScoreId) {
+                alert("参数错误：缺少kpiScoreId");
+                return;
+            }
+            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) {
+                return;
+            }
+
             $.ajax({
                 url: ctx + "video/record/cancelDeduct",
                 type: "POST",
                 contentType: "application/json",
                 data: JSON.stringify({
-                    itemId: videoItemId,
-                    videoDate: $("#checkDate").val(),
-                    deductInfo: deductInfo
+                    itemId: itemId,
+                    deductInfo: deductInfo,
+                    kpiScoreId: kpiScoreId,
+                    batchNo: $("#batchNo").val()
                 }),
                 success: function (res) {
                     if (res.code == 0) {
                         alert("撤销成功");
-                        loadData();
+
+                        // 更新 textarea
+                        var textarea = $('textarea[data-item-id="' + itemId + '"]');
+                        if (textarea.length > 0) {
+                            var currentValue = textarea.val() || '';
+                            var lines = currentValue.split('\n');
+                            var newLines = [];
+                            for (var i = 0; i < lines.length; i++) {
+                                if (lines[i].trim().indexOf(deductInfo.trim()) !== -1) {
+                                    continue;
+                                }
+                                if (lines[i].trim()) {
+                                    newLines.push(lines[i]);
+                                }
+                            }
+                            var newValue = newLines.join('\n').trim();
+                            if (!newValue) {
+                                newValue = '正常';
+                            }
+                            textarea.val(newValue);
+                            // 自动保存
+                            saveData(true);
+                        }
                     } else {
                         alert("操作失败：" + res.msg);
                     }
+                },
+                error: function (xhr) {
+                    alert("请求失败：" + xhr.status);
                 }
             });
         }

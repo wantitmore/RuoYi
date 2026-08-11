@@ -15,10 +15,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"    column="update_time"    />
+        <result property="sourceRecordId" column="source_record_id" />
     </resultMap>
 
     <sql id="selectKpiScoreVo">
-        select id, user_id, item_id, score, batch_no, remark, create_by, create_time, update_by, update_time 
+        select id, user_id, item_id, score, batch_no, remark, create_by, create_time, update_by, update_time, source_record_id
         from kpi_score
     </sql>
 
