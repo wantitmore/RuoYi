@@ -6,6 +6,33 @@
 </head>
 
 <body class="gray-bg">
+    <style>
+        /* 月汇总表格行分割 */
+        #summaryTable tbody tr {
+            border-bottom: 2px solid #ccc;
+            /* 加粗实线分割 */
+            transition: background 0.2s;
+        }
+
+        /* #summaryTable tbody tr:last-child {
+            border-bottom: none;
+        } */
+
+        #summaryTable tbody tr:hover {
+            background: #f9f9f9;
+            /* 鼠标悬停背景变化，增强视觉区分 */
+        }
+
+        /* 内部记录之间的分隔线（细化） */
+        #summaryTable tbody td .record-item {
+            border-bottom: 1px dashed #ddd;
+            padding: 6px 0;
+        }
+
+        #summaryTable tbody td .record-item:last-child {
+            border-bottom: none;
+        }
+    </style>
     <div class="wrapper wrapper-content animated fadeInRight">
         <div class="row">
             <div class="col-sm-12">
