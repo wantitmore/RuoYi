@@ -209,7 +209,7 @@ public class SixCheckRecordController extends BaseController {
             // 只处理包含扣分信息的记录
             if (recordValue != null && recordValue.contains("关联加扣分")) {
                 // 查询关联的 kpi_score.id
-                
+
                 KpiScore scoreQuery = new KpiScore();
                 scoreQuery.setSourceRecordId(r.getId());
                 scoreQuery.setBatchNo(batchNo);
@@ -299,6 +299,106 @@ public class SixCheckRecordController extends BaseController {
         return "sixcheck/summary";
     }
 
+    /* 日梳理 */
+    @GetMapping("/dailySummary")
+    @ResponseBody
+    public AjaxResult dailySummary(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date checkDate,
+            @RequestParam(required = false) Long deptId) {
+        if (!ShiroUtils.getSysUser().isAdmin()) {
+            deptId = ShiroUtils.getSysUser().getDeptId();
+        }
+
+        // 1. 查询该日期所有班次的记录（不过滤正常/异常）
+        SixCheckRecord query = new SixCheckRecord();
+        query.setCheckDate(checkDate);
+        query.setDeptId(deptId);
+        List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(query);
+
+        // 2. 获取检查项目（本部门优先）
+        SixCheckItem queryItem = new SixCheckItem();
+        if (deptId != null)
+            queryItem.setDeptId(deptId);
+        List<SixCheckItem> items = sixCheckItemService.selectSixCheckItemList(queryItem);
+        if (items.isEmpty()) {
+            items = sixCheckItemService.selectSixCheckItemList(new SixCheckItem());
+        }
+        items.sort(Comparator.comparing(SixCheckItem::getSortOrder));
+
+        // 3. 按项目分组
+        Map<Long, List<SixCheckRecord>> grouped = new LinkedHashMap<>();
+        for (SixCheckItem item : items) {
+            grouped.put(item.getId(), new ArrayList<>());
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+        for (SixCheckRecord r : records) {
+            if (grouped.containsKey(r.getItemId())) {
+                grouped.get(r.getItemId()).add(r);
+            }
+        }
+
+        // 4. 组装返回数据（与月汇总完全一致）
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (SixCheckItem item : items) {
+            List<SixCheckRecord> recs = grouped.get(item.getId());
+            if (recs.isEmpty()) {
+                // 当天没有该项目的记录，视为正常（但一般都会有记录，因为录入时每个项目都会有）
+                Map<String, Object> itemMap = new HashMap<>();
+                itemMap.put("itemName", item.getName());
+                List<Map<String, String>> detailList = new ArrayList<>();
+                // 可以放一条正常记录，或直接空列表
+                // 但为了显示“正常”，我们可以放一条内容为“正常”的占位记录
+                Map<String, String> normal = new HashMap<>();
+                normal.put("shift", "全部班次");
+                normal.put("leader", "");
+                normal.put("content", "正常");
+                normal.put("time", "");
+                detailList.add(normal);
+                itemMap.put("details", detailList);
+                result.add(itemMap);
+                continue;
+            }
+
+            // 判断是否全部为正常
+            boolean allNormal = recs.stream().allMatch(r -> {
+                String val = r.getRecordValue();
+                return val == null || val.trim().isEmpty() || val.trim().equals("正常");
+            });
+
+            Map<String, Object> itemMap = new HashMap<>();
+            itemMap.put("itemName", item.getName());
+            List<Map<String, String>> detailList = new ArrayList<>();
+
+            if (allNormal) {
+                // 全部正常，只显示一条“正常”
+                Map<String, String> normal = new HashMap<>();
+                normal.put("shift", "全部班次");
+                normal.put("leader", "");
+                normal.put("content", "正常");
+                normal.put("time", "");
+                detailList.add(normal);
+            } else {
+                // 有异常，列出所有异常记录（正常记录也可以列出，但只显示异常即可）
+                for (SixCheckRecord r : recs) {
+                    String val = r.getRecordValue();
+                    if (val != null && !val.trim().isEmpty() && !val.trim().equals("正常")) {
+                        Map<String, String> detail = new HashMap<>();
+                        detail.put("shift", r.getShift() != null ? r.getShift() : "");
+                        detail.put("leader", r.getDutyLeader() != null ? r.getDutyLeader() : "");
+                        detail.put("content", val);
+                        detail.put("time", sdf.format(r.getCreateTime()));
+                        detailList.add(detail);
+                    }
+                }
+            }
+            itemMap.put("details", detailList);
+            result.add(itemMap);
+        }
+
+        return success().put("data", result);
+    }
+
+    /* 月汇总 */
     @RequiresPermissions("sixcheck:summary")
     @GetMapping("/summary/data")
     @ResponseBody
@@ -385,7 +485,7 @@ public class SixCheckRecordController extends BaseController {
             if (params.get("kpiScoreId") != null) {
                 kpiScoreId = Long.valueOf(params.get("kpiScoreId").toString());
                 String deductInfo = params.get("deductInfo").toString();
-        System.out.println("=== 撤销参数: kpiScoreId=" + kpiScoreId + ", deductInfo=" + deductInfo);
+                System.out.println("=== 撤销参数: kpiScoreId=" + kpiScoreId + ", deductInfo=" + deductInfo);
             }
             if (kpiScoreId == null) {
                 return error("参数错误：缺少kpiScoreId");
@@ -406,8 +506,8 @@ public class SixCheckRecordController extends BaseController {
             if (kpiScore == null) {
                 return error("未找到考核记录，kpiScoreId=" + kpiScoreId);
             }
-             System.out.println("=== 查询到 KPI 记录: id=" + kpiScore.getId()
-              + ", score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
+            System.out.println("=== 查询到 KPI 记录: id=" + kpiScore.getId()
+                    + ", score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
 
             // ========== 3. 校验：只有六必查关联扣分才能撤销 (去掉校验)==========
 
@@ -416,7 +516,7 @@ public class SixCheckRecordController extends BaseController {
             System.out.println("remark is " + remark + ", deductInfo is " + deductInfo);
             if (remark == null || !remark.contains(deductInfo)) {
                 System.out.println("=== 幂等性校验失败: remark 为空或不包含 deductInfo");
-            return error("该扣分记录已撤销或不存在");
+                return error("该扣分记录已撤销或不存在");
             }
 
             // ========== 5. 恢复分数 ==========
@@ -427,19 +527,20 @@ public class SixCheckRecordController extends BaseController {
             }
             BigDecimal originalScore = kpiScore.getScore();
             BigDecimal newScore = originalScore.add(deductScore);
-            System.out.println("=== 分数变化: 原始=" + originalScore + ", deductScore=" + deductScore + ", 计算后新分数=" + newScore);
+            System.out
+                    .println("=== 分数变化: 原始=" + originalScore + ", deductScore=" + deductScore + ", 计算后新分数=" + newScore);
 
             // ========== 6. 移除扣分描述 ==========
             System.out.println("remark : " + remark + ", deductInfo " + deductInfo);
             String newRemark = remark.replace(deductInfo, "").trim();
             System.out.println("=== 移除前 remark: " + remark);
-        System.out.println("=== 移除后 newRemark: " + newRemark);
+            System.out.println("=== 移除后 newRemark: " + newRemark);
             kpiScore.setRemark(newRemark.isEmpty() ? null : newRemark);
-            kpiScore.setScore(newRemark.isEmpty() ? null : newScore); 
+            kpiScore.setScore(newRemark.isEmpty() ? null : newScore);
             System.out.println("new remark is " + newRemark);
             kpiScore.setUpdateBy(loginName);
             kpiScoreService.updateKpiScore(kpiScore);
-             System.out.println("=== KPI 更新后: score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
+            System.out.println("=== KPI 更新后: score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
 
             // ========== 7. 更新六必查记录（如果存在） ==========
             Long recordId = kpiScore.getSourceRecordId();
@@ -456,7 +557,7 @@ public class SixCheckRecordController extends BaseController {
                         record.setRecordValue(newRecordValue.isEmpty() ? "正常" : newRecordValue);
                         record.setUpdateBy(loginName);
                         sixCheckRecordService.updateSixCheckRecord(record);
-                    } else{
+                    } else {
                         System.out.println("=== 六必查 recordValue 不包含 deductInfo，跳过更新");
                     }
                 }
