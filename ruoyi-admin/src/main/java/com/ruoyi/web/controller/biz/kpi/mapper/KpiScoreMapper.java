@@ -6,6 +6,7 @@ import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo;
 import com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary;
 
 /**
@@ -77,4 +78,8 @@ public interface KpiScoreMapper {
 
         List<KpiScore> selectByMonths(@Param("months") List<String> months,
                         @Param("userId") Long userId);
+
+        List<KpiScoreDetailVo> selectAllDetail(@Param("months") List<String> months,
+                                       @Param("deptId") Long deptId,
+                                       @Param("postId") Long postId);
 }

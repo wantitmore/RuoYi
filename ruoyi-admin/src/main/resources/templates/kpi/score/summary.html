@@ -39,12 +39,15 @@
                                             th:text="${post.postName}"></option>
                                     </select>
                                 </div>
-                                <div class="col-sm-2" style="display: flex; gap: 50px;">
+                                <div class="col-sm-4" style="display: flex; gap: 50px;">
+                                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                                        <i class="fa fa-file-excel-o"></i> 导出(简)
+                                    </button>
+                                    <button class="btn btn-warning" onclick="exportAll()">
+                                        <i class="fa fa-file-excel-o"></i> 导出明细
+                                    </button>
                                     <button type="button" class="btn btn-primary" onclick="search()">
                                         <i class="fa fa-search"></i> 查询
-                                    </button>
-                                    <button type="button" class="btn btn-success" onclick="exportExcel()">
-                                        <i class="fa fa-file-excel-o"></i> 导出Excel
                                     </button>
                                 </div>
                             </div>
@@ -219,6 +222,22 @@
                     url += "&postId=" + encodeURIComponent(postId);
                 }
                 window.location.href = url;
+            }
+
+            function exportAll() {
+                var startMonth = $("#startMonth").val();
+                var endMonth = $("#endMonth").val();
+                var deptId = $("#deptSelect").val();
+                var postId = $("#postSelect").val();
+                if (!startMonth || !endMonth) {
+                    alert("请选择月份区间");
+                    return;
+                }
+                var url = ctx + "kpi/score/summary/exportAll?startMonth=" + encodeURIComponent(startMonth) +
+                    "&endMonth=" + encodeURIComponent(endMonth);
+                if (deptId) url += "&deptId=" + deptId;
+                if (postId) url += "&postId=" + postId;
+                window.open(url, '_blank');
             }
 
             $(function () {

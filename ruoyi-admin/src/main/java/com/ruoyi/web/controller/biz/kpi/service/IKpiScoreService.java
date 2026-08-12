@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo;
 import com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary;
 
 /**
@@ -70,4 +71,5 @@ public interface IKpiScoreService
                     Long postId);
 
     List<KpiScore> selectByMonths(Long userId, List<String> months);
+    List<KpiScoreDetailVo> selectAllDetail(List<String> months, Long deptId, Long postId);
 }

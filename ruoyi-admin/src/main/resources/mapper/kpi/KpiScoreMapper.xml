@@ -77,6 +77,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ORDER BY batch_no, id
     </select>
 
+    <select id="selectAllDetail" resultType="com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo">
+        SELECT 
+            k.batch_no AS batchNo,
+            u.user_name AS userName,
+            ki.name AS itemName,
+            k.score,
+            k.remark
+        FROM kpi_score k
+        JOIN sys_user u ON k.user_id = u.user_id
+        JOIN kpi_item ki ON k.item_id = ki.id
+        WHERE 1=1
+        <if test="months != null and months.size() > 0">
+            AND k.batch_no IN
+            <foreach collection="months" item="month" open="(" separator="," close=")">
+                #{month}
+            </foreach>
+        </if>
+        <if test="deptId != null">
+            AND k.dept_id = #{deptId}
+        </if>
+        <if test="postId != null">
+            AND ki.dept_id = #{postId}
+        </if>
+        ORDER BY k.batch_no, u.user_name
+    </select>
+
     <insert id="insertKpiScore" parameterType="KpiScore" useGeneratedKeys="true" keyProperty="id">
     insert into kpi_score
     <trim prefix="(" suffix=")" suffixOverrides=",">

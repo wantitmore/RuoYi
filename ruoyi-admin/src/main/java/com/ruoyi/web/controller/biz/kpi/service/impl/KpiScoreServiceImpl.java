@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ruoyi.web.controller.biz.kpi.mapper.KpiScoreMapper;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo;
 import com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
 import com.ruoyi.common.core.text.Convert;
@@ -25,11 +26,13 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
     @Autowired
     private KpiScoreMapper kpiScoreMapper;
 
-/*     @Override
-    public List<ScoreSummary> selectSummary(String batchNo, Long deptId, Long postId) {
-        return kpiScoreMapper.selectSummary(batchNo, deptId, postId);
-    }
- */
+    /*
+     * @Override
+     * public List<ScoreSummary> selectSummary(String batchNo, Long deptId, Long
+     * postId) {
+     * return kpiScoreMapper.selectSummary(batchNo, deptId, postId);
+     * }
+     */
     /**
      * 查询考核分数
      * 
@@ -104,7 +107,7 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
     }
 
     @Override
-    public  List<ScoreSummary>  selectAvgSummary(List<String> months, Long deptId, Long postId) {
+    public List<ScoreSummary> selectAvgSummary(List<String> months, Long deptId, Long postId) {
         if (months != null && !months.isEmpty()) {
             return kpiScoreMapper.selectAvgSummary(months, deptId, postId);
         }
@@ -113,6 +116,11 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
 
     @Override
     public List<KpiScore> selectByMonths(Long userId, List<String> months) {
-        return kpiScoreMapper.selectByMonths( months, userId);
+        return kpiScoreMapper.selectByMonths(months, userId);
+    }
+
+    @Override
+    public List<KpiScoreDetailVo> selectAllDetail(List<String> months, Long deptId, Long postId) {
+        return kpiScoreMapper.selectAllDetail(months, deptId, postId);
     }
 }

@@ -1,7 +1,9 @@
 package com.ruoyi.web.controller.biz.kpi.controller;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -13,6 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -23,10 +32,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+
+// import com.mysql.cj.result.Row;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiItem;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
+import com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo;
 import com.ruoyi.web.controller.biz.kpi.domain.QuickDeductDTO;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
@@ -663,6 +679,86 @@ public class KpiScoreController extends BaseController {
         System.out.println("=== videoQuickDeduct: 成功，videoRecordId=" + videoRecordId + ", kpiScoreId=" + finalScoreId);
 
         return success("加扣分成功！").put("kpiScoreId", finalScoreId);
+    }
+
+    /**
+     * 导出考核汇总（含明细）
+     * 包含两个Sheet：汇总排名 + 全部明细
+     */
+    @GetMapping("/summary/exportAll")
+    public void exportAll(HttpServletResponse response,
+            @RequestParam String startMonth,
+            @RequestParam String endMonth,
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) Long postId) throws IOException {
+        // 1. 查询汇总数据
+        List<String> months = getMonthsBetween(startMonth, endMonth);
+        List<ScoreSummary> summaryList = kpiScoreService.selectAvgSummary(months, deptId, postId);
+        for (int i = 0; i < summaryList.size(); i++) {
+            summaryList.get(i).setRank(i + 1);
+        }
+
+        // 2. 查询明细数据
+        List<KpiScoreDetailVo> detailList = kpiScoreService.selectAllDetail(months, deptId, postId);
+
+        // 3. 创建工作簿
+        Workbook workbook = new XSSFWorkbook();
+
+        // ---------- Sheet 1: 汇总排名 ----------
+        Sheet summarySheet = workbook.createSheet("汇总排名");
+        String[] summaryHeaders = { "排名", "姓名", "部门", "岗位", "总分" };
+        createHeaderRow(summarySheet, summaryHeaders);
+        int rowNum = 1;
+        for (ScoreSummary s : summaryList) {
+            Row row = summarySheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(s.getRank());
+            row.createCell(1).setCellValue(s.getUserName());
+            row.createCell(2).setCellValue(s.getDeptName());
+            row.createCell(3).setCellValue(s.getPostName());
+            row.createCell(4).setCellValue(s.getTotalScore() != null ? s.getTotalScore().doubleValue() : 0);
+        }
+        for (int i = 0; i < summaryHeaders.length; i++) {
+            summarySheet.autoSizeColumn(i);
+        }
+
+        // ---------- Sheet 2: 全部明细 ----------
+        Sheet detailSheet = workbook.createSheet("全部明细");
+        String[] detailHeaders = { "月份", "姓名", "考核项目", "得分", "备注" };
+        createHeaderRow(detailSheet, detailHeaders);
+        rowNum = 1;
+        for (KpiScoreDetailVo d : detailList) {
+            Row row = detailSheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(d.getBatchNo());
+            row.createCell(1).setCellValue(d.getUserName());
+            row.createCell(2).setCellValue(d.getItemName());
+            row.createCell(3).setCellValue(d.getScore() != null ? d.getScore().doubleValue() : 0);
+            row.createCell(4).setCellValue(d.getRemark() != null ? d.getRemark() : "");
+        }
+        for (int i = 0; i < detailHeaders.length; i++) {
+            detailSheet.autoSizeColumn(i);
+        }
+
+        // 4. 输出到 response
+        String fileName = URLEncoder.encode("考核汇总_" + startMonth + "_至_" + endMonth + ".xlsx", "UTF-8");
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+        workbook.write(response.getOutputStream());
+        workbook.close();
+    }
+
+    // 辅助方法：创建表头行（带样式）
+    private void createHeaderRow(Sheet sheet, String[] headers) {
+        Row headerRow = sheet.createRow(0);
+        CellStyle style = sheet.getWorkbook().createCellStyle();
+        Font font = sheet.getWorkbook().createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(style);
+        }
     }
 
 }
