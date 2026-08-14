@@ -33,15 +33,13 @@
             s.shift, 
             s.duty_leader,
             s.update_by, 
-            s.update_time,
-            k.id AS kpi_score_id
+            s.update_time
     </sql>
 
     <!-- 列表查询（带条件） -->
     <select id="selectSixCheckRecordList" parameterType="SixCheckRecord" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
         from six_check_record s
-        LEFT JOIN kpi_score k ON k.source_record_id = s.id
         <where>
             <if test="itemId != null">AND s.item_id = #{itemId}</if>
             <if test="recordValue != null and recordValue != ''">AND s.record_value = #{recordValue}</if>
@@ -57,7 +55,6 @@
     <select id="selectSixCheckRecordById" parameterType="Long" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
         from six_check_record s
-        LEFT JOIN kpi_score k ON k.source_record_id = s.id
         where s.id = #{id}
     </select>
 
@@ -65,7 +62,6 @@
     <select id="selectListByMonth" resultMap="SixCheckRecordResult">
         <include refid="selectSixCheckRecordVo"/>
         from six_check_record s
-        LEFT JOIN kpi_score k ON k.source_record_id = s.id
         <where>
             DATE_FORMAT(s.check_date, '%Y-%m') = #{month}
             <if test="deptId != null">AND s.dept_id = #{deptId}</if>

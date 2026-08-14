@@ -46,8 +46,10 @@ import com.ruoyi.web.controller.biz.kpi.domain.KpiScoreDetailVo;
 import com.ruoyi.web.controller.biz.kpi.domain.QuickDeductDTO;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckDeductDetail;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckDeductDetailService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckItemService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
@@ -107,6 +109,9 @@ public class KpiScoreController extends BaseController {
 
     @Autowired
     private IVideoPlaybackRecordService videoPlaybackRecordService;
+
+    @Autowired
+    private ISixCheckDeductDetailService sixCheckDeductDetailService;
 
     @RequiresPermissions("kpi:score:view")
     @GetMapping()
@@ -320,10 +325,13 @@ public class KpiScoreController extends BaseController {
         // 转成 Map<"userId_itemId", score> 方便前端查找
         Map<String, Map<String, Object>> scoreMap = new HashMap<>();
         for (KpiScore s : existingScores) {
-            Map<String, Object> detail = new HashMap<>();
-            detail.put("score", s.getScore() != null ? s.getScore() : 0);
-            detail.put("remark", s.getRemark() != null ? s.getRemark() : "");
-            scoreMap.put(s.getUserId() + "_" + s.getItemId(), detail);
+            if (/* StringUtils.isNotBlank(s.getRemark()) &&  */s.getScore() != null) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("score", s.getScore() != null ? s.getScore() : 0);
+                detail.put("remark", s.getRemark() != null ? s.getRemark() : "");
+                scoreMap.put(s.getUserId() + "_" + s.getItemId(), detail);
+                System.out.println("s.getScore() " + s.getScore() + ", s.getRemark() " + s.getRemark());
+            }
         }
 
         // 4. 组装返回数据
@@ -356,25 +364,6 @@ public class KpiScoreController extends BaseController {
         return "kpi/score/summary";
     }
 
-    // 返回 JSON 数据的方法（访问地址：/kpi/score/summary/data）
-    /*
-     * @GetMapping("/summary/data")
-     * 
-     * @ResponseBody
-     * public AjaxResult summaryData(@RequestParam String batchNo,
-     * 
-     * @RequestParam(required = false) Long deptId,
-     * 
-     * @RequestParam(required = false) Long postId) {
-     * SysUser user = ShiroUtils.getSysUser();
-     * if (!user.isAdmin()) {
-     * deptId = user.getDeptId();
-     * }
-     * List<ScoreSummary> list = kpiScoreService.selectAvgSummary(batchNo, deptId,
-     * postId);
-     * return success().put("data", list);
-     * }
-     */
 
     @GetMapping("/personDetail")
     @ResponseBody
@@ -516,6 +505,20 @@ public class KpiScoreController extends BaseController {
         Map<String, Object> result = new HashMap<>();
         result.put("kpiScoreId", finalScoreId);
         result.put("finalValue", finalValue); // 供前端更新 textarea
+        // 在保存或更新 KPI 记录后，得到 finalScoreId
+
+        // 插入扣分明细
+        if (finalScoreId != null && sixCheckRecordId != null) {
+            SixCheckDeductDetail detail = new SixCheckDeductDetail();
+            detail.setSixCheckRecordId(sixCheckRecordId);
+            detail.setKpiScoreId(finalScoreId);
+            detail.setDeductInfo(deductInfo);
+            detail.setStatus(1);
+            detail.setCreateBy(ShiroUtils.getLoginName());
+            detail.setDeductScore(dto.getScore());
+            sixCheckDeductDetailService.insert(detail);
+            System.out.println("=== 插入扣分明细成功，detailId=" + detail.getId());
+        }
         return success("加扣分成功！").put("data", result);
     }
 

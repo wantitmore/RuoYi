@@ -31,11 +31,14 @@ import com.ruoyi.web.controller.biz.kpi.domain.KpiItem;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckDeductDetail;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecordWrapper;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckDeductDetailService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckItemService;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
+import com.ruoyi.web.controller.biz.sixcheck.service.impl.SixCheckDeductDetailServiceImpl;
 
 import io.micrometer.common.util.StringUtils;
 
@@ -73,6 +76,9 @@ public class SixCheckRecordController extends BaseController {
     private IKpiItemService kpiItemService; // 注入考核项目Service
     @Autowired
     private ISysUserService userService;
+
+    @Autowired
+    private ISixCheckDeductDetailService sixCheckDeductDetailService;
 
     @GetMapping("/input")
     public String input(ModelMap mmap) {
@@ -186,30 +192,24 @@ public class SixCheckRecordController extends BaseController {
         queryRecord.setShift(shift);
         queryRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
         List<SixCheckRecord> records = sixCheckRecordService.selectSixCheckRecordList(queryRecord);
-        System.out.println("=== 查询条件: checkDate=" + queryRecord.getCheckDate()
-                + ", shift=" + queryRecord.getShift()
-                + ", deptId=" + queryRecord.getDeptId());
 
         Map<Long, String> recordMap = new HashMap<>();
+        Map<Long, Long> recordIdMap = new HashMap<>();
         String dutyLeader = "";
         for (SixCheckRecord r : records) {
             recordMap.put(r.getItemId(), r.getRecordValue());
-            System.out.println("getRemark is " + r.getRemark() + ", getRecordValue " + r.getRecordValue());
+            recordIdMap.put(r.getItemId(), r.getId());
         }
         if (!records.isEmpty()) {
             dutyLeader = records.get(0).getDutyLeader() != null ? records.get(0).getDutyLeader() : "";
         }
 
-        // ========== 新增：构建 kpiScoreMap ==========
+        // ========== 构建 kpiScoreMap（原有逻辑） ==========
         String batchNo = new SimpleDateFormat("yyyy-MM").format(checkDate);
-
         Map<Long, Long> kpiScoreMap = new HashMap<>();
         for (SixCheckRecord r : records) {
             String recordValue = r.getRecordValue();
-            // 只处理包含扣分信息的记录
             if (recordValue != null && recordValue.contains("关联加扣分")) {
-                // 查询关联的 kpi_score.id
-
                 KpiScore scoreQuery = new KpiScore();
                 scoreQuery.setSourceRecordId(r.getId());
                 scoreQuery.setBatchNo(batchNo);
@@ -220,12 +220,103 @@ public class SixCheckRecordController extends BaseController {
             }
         }
 
+        // ========== 新增：构建扣分明细列表（用于前端显示ID） ==========
+        List<Map<String, Object>> detailInfoList = new ArrayList<>();
+        for (SixCheckRecord r : records) {
+            System.out.println("=== 六必查记录 ID: " + r.getId());
+            SixCheckDeductDetail queryDetail = new SixCheckDeductDetail();
+            queryDetail.setSixCheckRecordId(r.getId());
+            queryDetail.setStatus(1);
+            List<SixCheckDeductDetail> details = sixCheckDeductDetailService.selectList(queryDetail);
+            System.out.println("=== 查询到明细数量: " + details.size());
+            for (SixCheckDeductDetail d : details) {
+                Map<String, Object> info = new HashMap<>();
+                info.put("detailId", d.getId());
+                info.put("deductInfo", d.getDeductInfo());
+                info.put("itemId", r.getItemId());
+                info.put("status", d.getStatus());
+                detailInfoList.add(info);
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("items", items);
         result.put("records", recordMap);
         result.put("dutyLeader", dutyLeader);
         result.put("kpiScoreMap", kpiScoreMap);
+        result.put("recordIdMap", recordIdMap);
+        result.put("detailInfoList", detailInfoList); // 新增
         return success().put("data", result);
+    }
+
+    /**
+     * 根据扣分明细ID撤销扣分
+     */
+    @PostMapping("/cancelByDetail")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult cancelByDetail(@RequestBody Map<String, Object> params) {
+        Long detailId = Long.valueOf(params.get("detailId").toString());
+
+        // 1. 查询扣分明细
+        SixCheckDeductDetail detail = sixCheckDeductDetailService.selectById(detailId);
+        if (detail == null || detail.getStatus() == 0) {
+            return error("扣分记录不存在或已撤销");
+        }
+
+        // 2. 通过 kpi_score_id 查询 KPI 记录
+        KpiScore kpiScore = kpiScoreService.selectKpiScoreById(detail.getKpiScoreId());
+        if (kpiScore == null) {
+            return error("关联的考核记录不存在");
+        }
+
+        // 3. 通过 source_record_id 获取六必查记录ID
+        Long sixCheckRecordId = kpiScore.getSourceRecordId();
+        if (sixCheckRecordId == null) {
+            return error("该扣分记录未关联六必查记录，无法撤销");
+        }
+
+        // 4. 恢复 KPI 分数 + 移除备注
+        // BigDecimal deductScore = extractScore(detail.getDeductInfo());
+        BigDecimal deductScore = detail.getDeductScore();
+        if (deductScore != null && deductScore.compareTo(BigDecimal.ZERO) != 0) {
+
+            System.out.println("kpiScore.getScore() 原来：" + kpiScore.getScore());
+            kpiScore.setScore(kpiScore.getScore().subtract(deductScore));
+            System.out.println("kpiScore.getScore() 之后：" + kpiScore.getScore());
+        }
+        if (StringUtils.isNotBlank(kpiScore.getRemark())) {
+            String newRemark = removeDeductInfoByLine(kpiScore.getRemark(), detail.getDeductInfo());
+            kpiScore.setRemark(newRemark);
+        }
+        kpiScore.setUpdateBy(ShiroUtils.getLoginName());
+        kpiScoreService.updateKpiScore(kpiScore);
+        BigDecimal currentScore = kpiScore.getScore();
+        String currentRemark = kpiScore.getRemark();
+        if ((currentScore == null || currentScore.compareTo(BigDecimal.ZERO) == 0)
+                && StringUtils.isBlank(currentRemark)) {
+            kpiScoreService.deleteKpiScoreById(kpiScore.getId());
+            System.out.println("=== 删除无效 KPI 记录 id=" + kpiScore.getId());
+        }
+
+        // 5. 更新六必查记录
+        SixCheckRecord record = sixCheckRecordService.selectSixCheckRecordById(sixCheckRecordId);
+        if (record != null) {
+            System.out.println("record is " + record.getRecordValue());
+            System.out.println("detail.getDeductInfo is " + detail.getDeductInfo());
+            String newValue = removeDeductInfoByLine(record.getRecordValue(), detail.getDeductInfo());
+            System.out.println("newValue is " + newValue);
+            record.setRecordValue(newValue == null ? "正常" : newValue);
+            record.setUpdateBy(ShiroUtils.getLoginName());
+            sixCheckRecordService.updateSixCheckRecord(record);
+        }
+
+        // 6. 标记明细为已撤销
+        detail.setStatus(0);
+        detail.setUpdateBy(ShiroUtils.getLoginName());
+        sixCheckDeductDetailService.update(detail);
+
+        return success("撤销成功");
     }
 
     @PostMapping("/save")
@@ -521,6 +612,7 @@ public class SixCheckRecordController extends BaseController {
 
             // ========== 5. 恢复分数 ==========
             BigDecimal deductScore = extractScore(deductInfo);
+            // detail.setDeductScore(dto.getScore());
             System.out.println("=== 解析 deductScore: " + deductScore);
             if (deductScore.compareTo(BigDecimal.ZERO) == 0) {
                 return error("无法解析扣分分数");
@@ -599,5 +691,22 @@ public class SixCheckRecordController extends BaseController {
             return m.group();
         }
         return null;
+    }
+
+    private String removeDeductInfoByLine(String content, String deductInfo) {
+        if (StringUtils.isBlank(content))
+            return null;
+        String[] lines = content.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            if (line.trim().equals(deductInfo.trim())) {
+                continue;
+            }
+            if (sb.length() > 0)
+                sb.append("\n");
+            sb.append(line);
+        }
+        String result = sb.toString().trim();
+        return StringUtils.isBlank(result) ? null : result;
     }
 }

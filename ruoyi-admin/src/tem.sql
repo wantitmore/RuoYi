@@ -501,8 +501,23 @@ WHERE d.del_flag = '0'
 ALTER TABLE kpi_score ADD COLUMN source_record_id bigint(20) DEFAULT NULL COMMENT '来源记录ID（关联六必查记录）';
 ALTER TABLE kpi_score ADD INDEX idx_source_record (source_record_id);
 
+--新增扣分明细表
+CREATE TABLE six_check_deduct_detail (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    kpi_score_id BIGINT NOT NULL COMMENT '关联的KPI记录ID',
+    deduct_info VARCHAR(500) COMMENT '扣分描述',
+    status TINYINT DEFAULT 1 COMMENT '1-有效，0-已撤销',
+    create_by VARCHAR(64),
+    create_time DATETIME,
+    update_by VARCHAR(64),
+    update_time DATETIME,
+    INDEX idx_kpi_score (kpi_score_id)
+) COMMENT '扣分明细表';
 
-
+ALTER TABLE six_check_deduct_detail ADD COLUMN six_check_record_id BIGINT COMMENT '六必查记录ID';
+ALTER TABLE six_check_deduct_detail ADD INDEX idx_six_check_record (six_check_record_id);
+ALTER TABLE six_check_deduct_detail 
+ADD COLUMN deduct_score DECIMAL(10,2) COMMENT '扣分分数（冗余存储，便于撤销）';
 
 
 
