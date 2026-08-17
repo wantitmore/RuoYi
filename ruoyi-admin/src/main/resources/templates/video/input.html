@@ -13,6 +13,17 @@
                     <div class="ibox-title">
                         <h5>视频回放录入</h5>
                     </div>
+                    <div th:if="${canEdit}" class="form-group"
+                        style="margin-top:15px;padding:10px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;">
+                        <label class="control-label" style="width:80px;">撤销扣分：</label>
+                        <div style="display:inline-block;width:200px;">
+                            <input type="number" id="cancelDetailId" class="form-control" placeholder="输入扣分明细ID" />
+                        </div>
+                        <button class="btn btn-danger" onclick="cancelByDetail()">
+                            <i class="fa fa-undo"></i> 撤销
+                        </button>
+                        <span style="margin-left:10px;color:#999;font-size:12px;">提示：点击上方ID标签可复制</span>
+                    </div>
                     <div class="ibox-content">
                         <div class="form-horizontal">
                             <div class="form-group">
@@ -34,7 +45,7 @@
                                         <th style="width: 60px;">序号</th>
                                         <th style="width: 15%;">倒查位置</th>
                                         <th style="width: 20%;">具体内容</th>
-                                        <th>回放情况</th>
+                                        <th style="width: 70%;">回放情况</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tableBody"></tbody>
@@ -78,6 +89,18 @@
                 var kpiScoreMap = res.data.kpiScoreMap || {};
                 var html = '';
                 var readonlyAttr = canEdit ? '' : 'readonly';
+                var detailInfoList = res.data.detailInfoList || [];
+                // 构建扣分明细映射：itemId + deductInfo -> detailId
+                var detailMap = {};
+                for (var i = 0; i < detailInfoList.length; i++) {
+                    var info = detailInfoList[i];
+                    console.log("i=" + i + " info.status " + info.status);
+                    if (info.status == 1) {
+                        var key = info.itemId + '|' + info.deductInfo;
+                        detailMap[key] = info.detailId;
+                    }
+                }
+                console.log("detailMap size " + Object.keys(detailMap).length);
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     var recordValue = records[item.id] || '';
@@ -87,20 +110,31 @@
                     html += '<td>' + item.specificContent + '</td>';
                     html += '<td><textarea class="form-control" data-item-id="' + item.id + '" rows="3" ' + readonlyAttr + '>' + recordValue + '</textarea></td>';
                     if (canEdit) {
-/*                         html += '<td><button class="btn btn-xs btn-warning" ' +
-                            'onclick="openDeductModal(\'' + item.name + '\', \'' + ($("#dutyLeader").val() || '') + '\', \'' + item.id + '\')">' +
-                            '<i class="fa fa-minus-circle"></i> 关联加扣分</button></td>'; */
+                        /*                         html += '<td><button class="btn btn-xs btn-warning" ' +
+                                                    'onclick="openDeductModal(\'' + item.name + '\', \'' + ($("#dutyLeader").val() || '') + '\', \'' + item.id + '\')">' +
+                                                    '<i class="fa fa-minus-circle"></i> 关联加扣分</button></td>'; */
                         html += '<td><button class="btn btn-xs btn-warning" onclick="openDeductModal(\'' + item.name + '\', ' + item.id + ')">关联加扣分</button></td>';
                     }
                     var deductPattern = /（关联加扣分-[^）]+）/g;
                     var deductMatches = recordValue.match(deductPattern);
                     if (deductMatches && deductMatches.length > 0) {
-                        var lastDeduct = deductMatches[deductMatches.length - 1];
-                        var kpiScoreId = kpiScoreMap[item.id] || '';
-                        console.log('kpiScoreId:', kpiScoreId);
-                        if (kpiScoreId) {
-                            html += '<td><button class="btn btn-xs btn-danger" onclick="cancelDeduct(\'' + lastDeduct.replace(/'/g, "\\'") + '\', ' + kpiScoreId + ', ' + item.id + ')">撤销</button></td>';
+                        // 显示每条扣分的明细ID
+                        var idHtml = '';
+                        for (var j = 0; j < deductMatches.length; j++) {
+                            var deduct = deductMatches[j];
+                            var key = item.id + '|' + deduct;
+                            var detailId = detailMap[key] || '';
+                            console.log("detailId is " + detailId + ", canEdit is " + canEdit);
+                            if (detailId && canEdit) {
+                                var displayText = deduct.length > 26 ? deduct.substring(0, 26) + '...' : deduct;
+                                idHtml += '<span class="label label-info" style="cursor:pointer; font-size:12px; margin:2px 4px 2px 0; display:inline-block;" title="'
+                                    + deduct.replace(/"/g, '&quot;')
+                                    + '" onclick="copyText(\'' + detailId + '\')">ID:' + detailId + '</span>';
+                            }
                         }
+                        html += '<td style="font-size:12px;">' + idHtml + '</td>';
+                    } else {
+                        html += '<td></td>';
                     }
                     html += '</tr>';
                 }
@@ -110,6 +144,15 @@
                     $("#saveBtn").show();
                 }
             });
+        }
+        function copyText(text) {
+            var input = document.createElement('input');
+            input.value = text;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            alert('已复制扣分明细ID: ' + text);
         }
 
         function saveData(silent) {
@@ -146,6 +189,38 @@
                 }
             });
         }
+        function cancelByDetail() {
+            var detailId = $("#cancelDetailId").val();
+            if (!detailId) {
+                alert("请输入要撤销的扣分明细ID");
+                return;
+            }
+            if (!confirm("确认撤销 ID=" + detailId + " 的视频回放记录吗？")) {
+                return;
+            }
+
+            $.ajax({
+                url: ctx + "video/record/cancelByDetail",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    detailId: detailId
+                }),
+                success: function (res) {
+                    if (res.code == 0) {
+                        alert("撤销成功！");
+                        $("#cancelDetailId").val(""); // 清空输入框
+                        loadData(); // 刷新页面
+                    } else {
+                        alert("撤销失败：" + res.msg);
+                    }
+                },
+                error: function (xhr) {
+                    alert("请求失败：" + xhr.status);
+                }
+            });
+        }
+
         function openDeductModal(checkItemName, videoItemId) {
             var deptId = [[${ currentDeptId }]];
             if (!deptId) {

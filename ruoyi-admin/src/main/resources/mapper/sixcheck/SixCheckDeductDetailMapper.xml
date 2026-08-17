@@ -13,17 +13,18 @@
         <result column="update_time" property="updateTime"/>
         <result column="six_check_record_id" property="sixCheckRecordId"/>
         <result column="deduct_score" property="deductScore"/>
+        <result column="source_type" property="sourceType"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, kpi_score_id, deduct_info, status, create_by, create_time, update_by, update_time, six_check_record_id, deduct_score
+        id, kpi_score_id, deduct_info, status, create_by, create_time, update_by, update_time, six_check_record_id, deduct_score, source_type
     </sql>
 
     <insert id="insert" parameterType="SixCheckDeductDetail" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO six_check_deduct_detail (
-            six_check_record_id, kpi_score_id, deduct_score, deduct_info, status, create_by, create_time
+            six_check_record_id, kpi_score_id, deduct_score, source_type, deduct_info, status, create_by, create_time
         ) VALUES (
-            #{sixCheckRecordId}, #{kpiScoreId}, #{deductScore}, #{deductInfo}, 1, #{createBy}, NOW()
+            #{sixCheckRecordId}, #{kpiScoreId}, #{deductScore}, #{sourceType}, #{deductInfo}, 1, #{createBy}, NOW()
         )
     </insert>
 

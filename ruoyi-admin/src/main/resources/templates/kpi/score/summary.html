@@ -123,11 +123,21 @@
                     } else {
                         for (var i = 0; i < details.length; i++) {
                             var d = details[i];
+                            var remarkHtml = '';
+                            if (d.remark) {
+                                var lines = d.remark.split('\n');
+                                for (var k = 0; k < lines.length; k++) {
+                                    var line = lines[k].trim();
+                                    if (line) {
+                                        remarkHtml += '<div style="border-bottom:1px dashed #eee; padding:2px 0;">' + (k + 1) + '. ' + line + '</div>';
+                                    }
+                                }
+                            }
                             content += '<tr>';
                             content += '<td>' + (d.batchNo || '') + '</td>';
                             content += '<td>' + d.itemName + '</td>';
                             content += '<td style="color:' + (d.score >= 0 ? 'green' : 'red') + '">' + (d.score >= 0 ? '+' : '') + d.score + '</td>';
-                            content += '<td>' + (d.remark || '') + '</td>';
+                            content += '<td>' + remarkHtml + '</td>';
                             content += '</tr>';
                         }
                     }

@@ -325,7 +325,7 @@ public class KpiScoreController extends BaseController {
         // 转成 Map<"userId_itemId", score> 方便前端查找
         Map<String, Map<String, Object>> scoreMap = new HashMap<>();
         for (KpiScore s : existingScores) {
-            if (/* StringUtils.isNotBlank(s.getRemark()) &&  */s.getScore() != null) {
+            if (/* StringUtils.isNotBlank(s.getRemark()) && */s.getScore() != null) {
                 Map<String, Object> detail = new HashMap<>();
                 detail.put("score", s.getScore() != null ? s.getScore() : 0);
                 detail.put("remark", s.getRemark() != null ? s.getRemark() : "");
@@ -363,7 +363,6 @@ public class KpiScoreController extends BaseController {
         mmap.put("posts", posts);
         return "kpi/score/summary";
     }
-
 
     @GetMapping("/personDetail")
     @ResponseBody
@@ -510,6 +509,7 @@ public class KpiScoreController extends BaseController {
         // 插入扣分明细
         if (finalScoreId != null && sixCheckRecordId != null) {
             SixCheckDeductDetail detail = new SixCheckDeductDetail();
+            detail.setSourceType("sixcheck");
             detail.setSixCheckRecordId(sixCheckRecordId);
             detail.setKpiScoreId(finalScoreId);
             detail.setDeductInfo(deductInfo);
@@ -601,25 +601,16 @@ public class KpiScoreController extends BaseController {
             return error("视频项目ID或日期不能为空");
         }
 
-        // 2. 生成批次号（使用视频日期，而不是当前时间）
-        // String batchNo = new SimpleDateFormat("yyyy-MM").format(dto.getVideoDate())
-        String batchNo = dto.getCheckDate().substring(0, 7);
-        System.out.println("=== videoQuickDeduct: batchNo=" + batchNo);
-
-        // 3. 查询已有 KPI 记录
-        KpiScore existQuery = new KpiScore();
-        existQuery.setUserId(dto.getUserId());
-        existQuery.setItemId(dto.getItemId());
-        existQuery.setBatchNo(batchNo);
-        List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
-
         // 4. 生成扣分描述
         SysUser user = userService.selectUserById(dto.getUserId());
         String userName = user != null ? user.getUserName() : dto.getUserId().toString();
         String deductInfo = String.format("（关联加扣分-%s-%.1f分-%s）",
                 userName, dto.getScore().doubleValue(), dto.getRemark());
 
-        Long finalScoreId;
+        // 2. 生成批次号（使用视频日期，而不是当前时间）
+        // String batchNo = new SimpleDateFormat("yyyy-MM").format(dto.getVideoDate())
+        String batchNo = dto.getCheckDate().substring(0, 7);
+        System.out.println("=== videoQuickDeduct: batchNo=" + batchNo);
 
         // 5. 处理视频回放记录（先获取或创建，拿到 ID）
         VideoPlaybackRecord videoRecord = null;
@@ -652,6 +643,15 @@ public class KpiScoreController extends BaseController {
         }
         Long videoRecordId = videoRecord.getId(); // 获取视频记录ID
 
+        // 3. 查询已有 KPI 记录
+        KpiScore existQuery = new KpiScore();
+        existQuery.setUserId(dto.getUserId());
+        existQuery.setItemId(dto.getItemId());
+        existQuery.setBatchNo(batchNo);
+        List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
+
+        Long finalScoreId;
+
         // 6. 处理 KPI 记录（建立 source_record_id 关联）
         if (!existList.isEmpty()) {
             KpiScore exist = existList.get(0);
@@ -677,6 +677,19 @@ public class KpiScoreController extends BaseController {
             score.setCreateBy(ShiroUtils.getLoginName());
             kpiScoreService.insertKpiScore(score);
             finalScoreId = score.getId();
+        }
+
+        // 插入扣分明细
+        if (finalScoreId != null) {
+            SixCheckDeductDetail detail = new SixCheckDeductDetail();
+            detail.setSourceType("video"); // 新增
+            detail.setSixCheckRecordId(videoRecordId); // 可关联视频记录ID
+            detail.setKpiScoreId(finalScoreId);
+            detail.setDeductInfo(deductInfo);
+            detail.setDeductScore(dto.getScore()); // 直接存分数
+            detail.setStatus(1);
+            detail.setCreateBy(ShiroUtils.getLoginName());
+            sixCheckDeductDetailService.insert(detail);
         }
 
         System.out.println("=== videoQuickDeduct: 成功，videoRecordId=" + videoRecordId + ", kpiScoreId=" + finalScoreId);

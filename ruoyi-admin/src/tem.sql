@@ -519,5 +519,7 @@ ALTER TABLE six_check_deduct_detail ADD INDEX idx_six_check_record (six_check_re
 ALTER TABLE six_check_deduct_detail 
 ADD COLUMN deduct_score DECIMAL(10,2) COMMENT '扣分分数（冗余存储，便于撤销）';
 
+ALTER TABLE six_check_deduct_detail 
+ADD COLUMN source_type VARCHAR(20) DEFAULT 'sixcheck' COMMENT '来源：sixcheck-六必查, video-视频回放';
 
 

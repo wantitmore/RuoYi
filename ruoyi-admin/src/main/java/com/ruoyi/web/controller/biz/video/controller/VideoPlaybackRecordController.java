@@ -1,6 +1,7 @@
 package com.ruoyi.web.controller.biz.video.controller;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -24,10 +25,13 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.ShiroUtils;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.web.controller.biz.common.service.CommonDeductService;
 import com.ruoyi.web.controller.biz.kpi.domain.KpiScore;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckDeductDetail;
+import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckDeductDetailService;
 import com.ruoyi.web.controller.biz.video.domain.VideoCheckItem;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
 import com.ruoyi.web.controller.biz.video.service.IVideoCheckItemService;
@@ -48,6 +52,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
     @Autowired
     private IKpiScoreService kpiScoreService;
+
+    @Autowired
+    private ISixCheckDeductDetailService sixCheckDeductDetailService;
 
     private String prefix = "video/record";
 
@@ -111,11 +118,31 @@ public class VideoPlaybackRecordController extends BaseController {
             }
         }
 
+        List<Map<String, Object>> detailInfoList = new ArrayList<>();
+        for (VideoPlaybackRecord r : records) {
+            SixCheckDeductDetail queryDetail = new SixCheckDeductDetail();
+            queryDetail.setSourceType("video"); //  只查视频来源
+            queryDetail.setSixCheckRecordId(r.getId());
+            queryDetail.setStatus(1);
+            List<SixCheckDeductDetail> details = sixCheckDeductDetailService.selectList(queryDetail);
+            for (SixCheckDeductDetail d : details) {
+                Map<String, Object> info = new HashMap<>();
+                info.put("detailId", d.getId());
+                info.put("deductInfo", d.getDeductInfo());
+                info.put("itemId", r.getItemId());
+                info.put("status", d.getStatus());
+                info.put("createBy", d.getCreateBy());
+                detailInfoList.add(info);
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
         result.put("items", items);
         result.put("records", recordMap);
         result.put("kpiScoreMap", kpiScoreMap);
+        result.put("detailInfoList", detailInfoList);
         return success().put("data", result);
+
     }
 
     @RequiresPermissions("video:record:edit")
@@ -140,6 +167,64 @@ public class VideoPlaybackRecordController extends BaseController {
             }
         }
         return success("保存成功");
+    }
+
+    @PostMapping("/cancelByDetail")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult cancelByDetail(@RequestBody Map<String, Object> params) {
+        Long detailId = Long.valueOf(params.get("detailId").toString());
+        System.out.println("detailId : " + detailId);
+        // 1. 查询明细（source_type 不需要特意过滤，但可加）
+        SixCheckDeductDetail detail = sixCheckDeductDetailService.selectById(detailId);
+        if (detail == null || detail.getStatus() == 0) {
+            return error("扣分记录不存在或已撤销");
+        }
+
+        // 2. 恢复 KPI 分数
+        KpiScore kpiScore = kpiScoreService.selectKpiScoreById(detail.getKpiScoreId());
+        if (kpiScore == null) {
+            return error("关联的考核记录不存在");
+        }
+
+        BigDecimal deductScore = detail.getDeductScore();
+        if (deductScore != null) {
+            kpiScore.setScore(kpiScore.getScore().subtract(deductScore));
+        }
+
+        // 3. 移除 KPI 备注中的扣分描述
+        if (StringUtils.isNotBlank(kpiScore.getRemark())) {
+            String newRemark = removeDeductInfoByLine(kpiScore.getRemark(), detail.getDeductInfo());
+            kpiScore.setRemark(newRemark);
+        }
+        kpiScore.setUpdateBy(ShiroUtils.getLoginName());
+        kpiScoreService.updateKpiScore(kpiScore);
+
+        // 4. 更新来源记录（视频回放或六必查）
+        Long sourceRecordId = detail.getSixCheckRecordId();
+        System.out.println("=== 撤销前=== sourceRecordId: [" + sourceRecordId + "]");
+        if (sourceRecordId != null && "video".equals(detail.getSourceType())) {
+            System.out.println("=== 撤销前 sourceRecordId: [" + sourceRecordId + "]");
+            VideoPlaybackRecord record = videoPlaybackRecordService.selectVideoPlaybackRecordById(sourceRecordId);
+            if (record != null) {
+                String oldStatus = record.getPlaybackStatus();
+                System.out.println("=== 撤销前 playback_status: [" + oldStatus + "]");
+                System.out.println("=== 待移除 deductInfo: [" + detail.getDeductInfo() + "]");
+                String newValue = removeDeductInfoByLine(record.getPlaybackStatus(), detail.getDeductInfo());
+                 System.out.println("=== 新 playback_status: [" + newValue + "]");
+                record.setPlaybackStatus(newValue == null ? "" : newValue);
+                record.setUpdateBy(ShiroUtils.getLoginName());
+                videoPlaybackRecordService.updateVideoPlaybackRecord(record);
+            }
+        }
+
+        // 5. 标记明细为已撤销
+        detail.setStatus(0);
+        System.out.println("撤销成功");
+        detail.setUpdateBy(ShiroUtils.getLoginName());
+        sixCheckDeductDetailService.update(detail);
+
+        return success("撤销成功");
     }
 
     @PostMapping("/cancelDeduct")
@@ -187,6 +272,26 @@ public class VideoPlaybackRecordController extends BaseController {
         kpiScoreService.updateKpiScore(kpiScore);
 
         return success("撤销成功");
+    }
+
+    private String removeDeductInfoByLine(String content, String deductInfo) {
+        if (StringUtils.isBlank(content))
+            return null;
+        System.out.println("content is " + content);
+         System.out.println("deductInfo is " + deductInfo);
+        String[] lines = content.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            if (line.trim().equals(deductInfo.trim())) {
+                continue;
+            }
+            if (sb.length() > 0)
+                sb.append("\n");
+            sb.append(line);
+        }
+        String result = sb.toString().trim();
+        System.out.println("result is " + result);
+        return StringUtils.isBlank(result) ? null : result;
     }
     // ==================== 以下为生成器自动生成的 CRUD 方法（请保持原有代码不变）====================
 
