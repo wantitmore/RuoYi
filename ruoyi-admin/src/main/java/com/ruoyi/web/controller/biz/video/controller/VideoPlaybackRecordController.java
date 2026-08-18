@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.ShiroUtils;
@@ -36,6 +37,7 @@ import com.ruoyi.web.controller.biz.video.domain.VideoCheckItem;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
 import com.ruoyi.web.controller.biz.video.service.IVideoCheckItemService;
 import com.ruoyi.web.controller.biz.video.service.IVideoPlaybackRecordService;
+import com.ruoyi.system.service.ISysUserService;
 
 @Controller
 @RequestMapping("/video/record")
@@ -55,6 +57,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
     @Autowired
     private ISixCheckDeductDetailService sixCheckDeductDetailService;
+
+    @Autowired
+    private ISysUserService userService;
 
     private String prefix = "video/record";
 
@@ -121,7 +126,7 @@ public class VideoPlaybackRecordController extends BaseController {
         List<Map<String, Object>> detailInfoList = new ArrayList<>();
         for (VideoPlaybackRecord r : records) {
             SixCheckDeductDetail queryDetail = new SixCheckDeductDetail();
-            queryDetail.setSourceType("video"); //  只查视频来源
+            queryDetail.setSourceType("video"); // 只查视频来源
             queryDetail.setSixCheckRecordId(r.getId());
             queryDetail.setStatus(1);
             List<SixCheckDeductDetail> details = sixCheckDeductDetailService.selectList(queryDetail);
@@ -187,6 +192,15 @@ public class VideoPlaybackRecordController extends BaseController {
             return error("关联的考核记录不存在");
         }
 
+        SysUser targetUser = userService.selectUserById(kpiScore.getUserId());
+        if (targetUser == null) {
+            return error("被考核人不存在");
+        }
+        SysUser currentUser = ShiroUtils.getSysUser();
+        if (!currentUser.isAdmin() && !currentUser.getDeptId().equals(targetUser.getDeptId())) {
+            return error("无权撤销其他部门的扣分记录");
+        }
+
         BigDecimal deductScore = detail.getDeductScore();
         if (deductScore != null) {
             kpiScore.setScore(kpiScore.getScore().subtract(deductScore));
@@ -211,7 +225,7 @@ public class VideoPlaybackRecordController extends BaseController {
                 System.out.println("=== 撤销前 playback_status: [" + oldStatus + "]");
                 System.out.println("=== 待移除 deductInfo: [" + detail.getDeductInfo() + "]");
                 String newValue = removeDeductInfoByLine(record.getPlaybackStatus(), detail.getDeductInfo());
-                 System.out.println("=== 新 playback_status: [" + newValue + "]");
+                System.out.println("=== 新 playback_status: [" + newValue + "]");
                 record.setPlaybackStatus(newValue == null ? "" : newValue);
                 record.setUpdateBy(ShiroUtils.getLoginName());
                 videoPlaybackRecordService.updateVideoPlaybackRecord(record);
@@ -278,7 +292,7 @@ public class VideoPlaybackRecordController extends BaseController {
         if (StringUtils.isBlank(content))
             return null;
         System.out.println("content is " + content);
-         System.out.println("deductInfo is " + deductInfo);
+        System.out.println("deductInfo is " + deductInfo);
         String[] lines = content.split("\n");
         StringBuilder sb = new StringBuilder();
         for (String line : lines) {
