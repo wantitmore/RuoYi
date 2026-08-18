@@ -270,6 +270,15 @@ public class SixCheckRecordController extends BaseController {
             return error("关联的考核记录不存在");
         }
 
+        SysUser targetUser = userService.selectUserById(kpiScore.getUserId());
+        if (targetUser == null) {
+            return error("被考核人不存在");
+        }
+        SysUser currentUser = ShiroUtils.getSysUser();
+        if (!currentUser.isAdmin() && !currentUser.getDeptId().equals(targetUser.getDeptId())) {
+            return error("无权撤销其他部门的扣分记录");
+        }
+
         // 3. 通过 source_record_id 获取六必查记录ID
         Long sixCheckRecordId = kpiScore.getSourceRecordId();
         if (sixCheckRecordId == null) {
