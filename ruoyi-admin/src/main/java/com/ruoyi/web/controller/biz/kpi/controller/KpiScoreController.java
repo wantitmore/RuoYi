@@ -530,6 +530,11 @@ public class KpiScoreController extends BaseController {
             @RequestParam String endMonth,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Long postId) { // 新增 postId
+        SysUser currentUser = ShiroUtils.getSysUser();
+        // 如果不是管理员，强制使用当前用户的部门
+        if (!currentUser.isAdmin()) {
+            deptId = currentUser.getDeptId();
+        }
         List<String> months = getMonthsBetween(startMonth, endMonth);
         List<ScoreSummary> list = kpiScoreService.selectAvgSummary(months, deptId, postId);
         System.out.println("months " + months + ", postId is " + postId);
@@ -707,6 +712,11 @@ public class KpiScoreController extends BaseController {
             @RequestParam String endMonth,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Long postId) throws IOException {
+        SysUser currentUser = ShiroUtils.getSysUser();
+        // 如果不是管理员，强制使用当前用户的部门
+        if (!currentUser.isAdmin()) {
+            deptId = currentUser.getDeptId();
+        }
         // 1. 查询汇总数据
         List<String> months = getMonthsBetween(startMonth, endMonth);
         List<ScoreSummary> summaryList = kpiScoreService.selectAvgSummary(months, deptId, postId);

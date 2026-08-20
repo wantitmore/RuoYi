@@ -87,6 +87,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         FROM kpi_score k
         JOIN sys_user u ON k.user_id = u.user_id
         JOIN kpi_item ki ON k.item_id = ki.id
+        LEFT JOIN sys_user_post up ON u.user_id = up.user_id
+        LEFT JOIN sys_post p ON up.post_id = p.post_id
         WHERE 1=1
         <if test="months != null and months.size() > 0">
             AND k.batch_no IN
@@ -95,10 +97,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             </foreach>
         </if>
         <if test="deptId != null">
-            AND k.dept_id = #{deptId}
+            AND u.dept_id = #{deptId}
         </if>
         <if test="postId != null">
-            AND ki.dept_id = #{postId}
+            AND up.post_id = #{postId}
         </if>
         ORDER BY k.batch_no, u.user_name
     </select>

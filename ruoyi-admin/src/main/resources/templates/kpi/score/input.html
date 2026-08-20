@@ -467,7 +467,7 @@
 
                     // 比较原始值和当前值：如果没变化，则跳过，不提交
                     if (score === null && originalVal === '') return;      // 都是空，跳过
-                    if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
+                    //if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
 
                     // 有变化（含清空）的条目才加入提交列表
                     scoreList.push({
