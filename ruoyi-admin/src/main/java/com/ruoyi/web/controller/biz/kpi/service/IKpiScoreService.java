@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.kpi.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -72,4 +73,7 @@ public interface IKpiScoreService
 
     List<KpiScore> selectByMonths(Long userId, List<String> months);
     List<KpiScoreDetailVo> selectAllDetail(List<String> months, Long deptId, Long postId);
+    BigDecimal calcTotalScoreMinus100(Long userId, String batchNo);
+
+    List<Long> selectUserIdsByBatchNoAndDept(Long deptId, String batchNo);
 }

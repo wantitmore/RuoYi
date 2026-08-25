@@ -201,7 +201,7 @@
                     <li style="display:none;"><a data-toggle="tooltip" data-trigger="hover" data-placement="bottom" title="开发文档" href="http://doc.ruoyi.vip/ruoyi" target="_blank"><i class="fa fa-question-circle"></i> 文档</a></li>
                     <li><a data-toggle="tooltip" data-trigger="hover" data-placement="bottom" title="锁定屏幕" href="javascript:;" id="lockScreen"><i class="fa fa-lock"></i> 锁屏</a></li>
 	                <li><a data-toggle="tooltip" data-trigger="hover" data-placement="bottom" title="全屏显示" href="javascript:;" id="fullScreen"><i class="fa fa-arrows-alt"></i> 全屏</a></li>
-                    <li style="display:none;" class="dropdown" id="noticeDropdown">
+                    <li  class="dropdown" id="noticeDropdown">
                         <a href="javascript:void(0)" class="dropdown-toggle" style="position:relative;" data-hover="dropdown">
                             <i class="fa fa-bell-o"></i> 消息
                             <span id="noticeBadge" style="display:none;position:absolute;top:8px;right:-4px;background:#e74c3c;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;font-style:normal;"></span>
@@ -423,7 +423,8 @@ function loadNoticeTop() {
 				return;
 			}
 			var list = res.data;
-			var unread = (res.unreadCount !== undefined && res.unreadCount !== null) ? res.unreadCount : list.length;
+			var unread = (res.unreadCount !== undefined && res.unreadCount !== null) ? res.unreadCount : 0;
+
 			if (unread > 0) {
 				$("#noticeBadge").text(unread).show();
 			} else {

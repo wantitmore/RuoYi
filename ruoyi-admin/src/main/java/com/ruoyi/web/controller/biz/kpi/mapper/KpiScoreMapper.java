@@ -82,4 +82,6 @@ public interface KpiScoreMapper {
         List<KpiScoreDetailVo> selectAllDetail(@Param("months") List<String> months,
                                        @Param("deptId") Long deptId,
                                        @Param("postId") Long postId);
+
+        List<Long> selectUserIdsByBatchNoAndDept(Long deptId, String batchNo);
 }

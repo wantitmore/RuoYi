@@ -522,4 +522,10 @@ ADD COLUMN deduct_score DECIMAL(10,2) COMMENT '扣分分数（冗余存储，便
 ALTER TABLE six_check_deduct_detail 
 ADD COLUMN source_type VARCHAR(20) DEFAULT 'sixcheck' COMMENT '来源：sixcheck-六必查, video-视频回放';
 
+CREATE TABLE sys_notice_receiver (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    notice_id BIGINT NOT NULL COMMENT '公告ID',
+    user_id BIGINT NOT NULL COMMENT '接收人用户ID',
+    UNIQUE KEY uk_notice_user (notice_id, user_id)
+) COMMENT='公告接收人表（用于控制可见性）';
 

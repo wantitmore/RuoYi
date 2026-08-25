@@ -1,6 +1,10 @@
 package com.ruoyi.web.controller.system;
 
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
+
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -21,6 +25,7 @@ import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.service.ISysNoticeReadService;
 import com.ruoyi.system.service.ISysNoticeService;
+import com.ruoyi.web.controller.biz.notice.mapper.SysNoticeReceiverMapper;
 
 /**
  * 公告 信息操作处理
@@ -29,8 +34,7 @@ import com.ruoyi.system.service.ISysNoticeService;
  */
 @Controller
 @RequestMapping("/system/notice")
-public class SysNoticeController extends BaseController
-{
+public class SysNoticeController extends BaseController {
     private String prefix = "system/notice";
 
     @Autowired
@@ -39,10 +43,12 @@ public class SysNoticeController extends BaseController
     @Autowired
     private ISysNoticeReadService noticeReadService;
 
+    @Autowired
+    private SysNoticeReceiverMapper noticeReceiverMapper;
+
     @RequiresPermissions("system:notice:view")
     @GetMapping()
-    public String notice()
-    {
+    public String notice() {
         return prefix + "/notice";
     }
 
@@ -52,8 +58,7 @@ public class SysNoticeController extends BaseController
     @RequiresPermissions("system:notice:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(SysNotice notice)
-    {
+    public TableDataInfo list(SysNotice notice) {
         startPage();
         List<SysNotice> list = noticeService.selectNoticeList(notice);
         return getDataTable(list);
@@ -64,8 +69,7 @@ public class SysNoticeController extends BaseController
      */
     @RequiresPermissions("system:notice:add")
     @GetMapping("/add")
-    public String add()
-    {
+    public String add() {
         return prefix + "/add";
     }
 
@@ -76,8 +80,7 @@ public class SysNoticeController extends BaseController
     @Log(title = "通知公告", businessType = BusinessType.INSERT)
     @PostMapping("/add")
     @ResponseBody
-    public AjaxResult addSave(@Validated SysNotice notice)
-    {
+    public AjaxResult addSave(@Validated SysNotice notice) {
         notice.setCreateBy(getLoginName());
         return toAjax(noticeService.insertNotice(notice));
     }
@@ -87,8 +90,7 @@ public class SysNoticeController extends BaseController
      */
     @RequiresPermissions("system:notice:edit")
     @GetMapping("/edit/{noticeId}")
-    public String edit(@PathVariable("noticeId") Long noticeId, ModelMap mmap)
-    {
+    public String edit(@PathVariable("noticeId") Long noticeId, ModelMap mmap) {
         mmap.put("notice", noticeService.selectNoticeById(noticeId));
         return prefix + "/edit";
     }
@@ -100,8 +102,7 @@ public class SysNoticeController extends BaseController
     @Log(title = "通知公告", businessType = BusinessType.UPDATE)
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult editSave(@Validated SysNotice notice)
-    {
+    public AjaxResult editSave(@Validated SysNotice notice) {
         notice.setUpdateBy(getLoginName());
         return toAjax(noticeService.updateNotice(notice));
     }
@@ -110,8 +111,7 @@ public class SysNoticeController extends BaseController
      * 查询公告详细
      */
     @GetMapping("/view/{noticeId}")
-    public String view(@PathVariable("noticeId") Long noticeId, ModelMap mmap)
-    {
+    public String view(@PathVariable("noticeId") Long noticeId, ModelMap mmap) {
         mmap.put("notice", noticeService.selectNoticeById(noticeId));
         return prefix + "/view";
     }
@@ -121,11 +121,26 @@ public class SysNoticeController extends BaseController
      */
     @GetMapping("/listTop")
     @ResponseBody
-    public AjaxResult listTop()
-    {
+    public AjaxResult listTop() {
         Long userId = ShiroUtils.getSysUser().getUserId();
+        boolean isAdmin = ShiroUtils.getSysUser().isAdmin();
+
+        // 1. 查询最新5条公告（原有逻辑）
         List<SysNotice> list = noticeReadService.selectNoticeListWithReadStatus(userId, 5);
+
+        // 2. 如果不是管理员，过滤预警
+        if (!isAdmin && list != null && !list.isEmpty()) {
+            // 查询当前用户有权查看的预警ID列表
+            List<Long> allowedNoticeIds = noticeReceiverMapper.selectNoticeIdsByUserId(userId);
+            // 过滤：保留普通公告（1、2）或者 有权查看的预警（3且ID在列表中）
+            list = list.stream()
+                    .filter(n -> !"3".equals(n.getNoticeType()) || allowedNoticeIds.contains(n.getNoticeId()))
+                    .collect(Collectors.toList());
+        }
+
+        // 3. 重新计算未读数量
         long unreadCount = list.stream().filter(n -> !n.getIsRead()).count();
+        System.out.println("最终未读数量: " + unreadCount); 
         AjaxResult result = AjaxResult.success(list);
         result.put("unreadCount", unreadCount);
         return result;
@@ -136,8 +151,7 @@ public class SysNoticeController extends BaseController
      */
     @PostMapping("/markRead")
     @ResponseBody
-    public AjaxResult markRead(Long noticeId)
-    {
+    public AjaxResult markRead(Long noticeId) {
         Long userId = ShiroUtils.getSysUser().getUserId();
         noticeReadService.markRead(noticeId, userId);
         return success();
@@ -148,8 +162,7 @@ public class SysNoticeController extends BaseController
      */
     @PostMapping("/markReadAll")
     @ResponseBody
-    public AjaxResult markReadAll(String ids)
-    {
+    public AjaxResult markReadAll(String ids) {
         Long userId = ShiroUtils.getSysUser().getUserId();
         Long[] noticeIds = Convert.toLongArray(ids);
         noticeReadService.markReadBatch(userId, noticeIds);
@@ -161,8 +174,7 @@ public class SysNoticeController extends BaseController
      */
     @RequiresPermissions("system:notice:list")
     @GetMapping("/readUsers/{noticeId}")
-    public String readUsers(@PathVariable("noticeId") Long noticeId, ModelMap mmap)
-    {
+    public String readUsers(@PathVariable("noticeId") Long noticeId, ModelMap mmap) {
         mmap.put("notice", noticeService.selectNoticeById(noticeId));
         return prefix + "/readUsers";
     }
@@ -173,8 +185,7 @@ public class SysNoticeController extends BaseController
     @RequiresPermissions("system:notice:list")
     @PostMapping("/readUsers/list")
     @ResponseBody
-    public TableDataInfo readUsersList(Long noticeId, String searchValue)
-    {
+    public TableDataInfo readUsersList(Long noticeId, String searchValue) {
         startPage();
         List<?> list = noticeReadService.selectReadUsersByNoticeId(noticeId, searchValue);
         return getDataTable(list);
@@ -187,8 +198,7 @@ public class SysNoticeController extends BaseController
     @Log(title = "通知公告", businessType = BusinessType.DELETE)
     @PostMapping("/remove")
     @ResponseBody
-    public AjaxResult remove(String ids)
-    {
+    public AjaxResult remove(String ids) {
         noticeReadService.deleteByNoticeIds(ids);
         return toAjax(noticeService.deleteNoticeByIds(ids));
     }

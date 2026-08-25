@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.notice.mapper.SysNoticeReceiverMapper">
+
+    <insert id="batchInsert">
+        insert ignore into sys_notice_receiver (notice_id, user_id)
+        values
+        <foreach collection="userIds" item="userId" separator=",">
+            (#{noticeId}, #{userId})
+        </foreach>
+    </insert>
+
+    <select id="selectNoticeIdsByUserId" resultType="java.lang.Long">
+        SELECT notice_id 
+        FROM sys_notice_receiver 
+        WHERE user_id = #{userId}
+    </select>
+</mapper>

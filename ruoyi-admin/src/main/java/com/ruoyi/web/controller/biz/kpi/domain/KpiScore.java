@@ -2,6 +2,8 @@ package com.ruoyi.web.controller.biz.kpi.domain;
 
 import java.beans.Transient;
 import java.math.BigDecimal;
+import java.util.List;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -39,8 +41,9 @@ public class KpiScore extends BaseEntity {
     @Excel(name = "考核批次", readConverterExp = "如=2024-Q4，可用于区分不同期次")
     private String batchNo;
 
-
     private Long sourceRecordId;
+
+    private List<Long> userIds;
 
     public static long getSerialversionuid() {
         return serialVersionUID;
@@ -53,8 +56,6 @@ public class KpiScore extends BaseEntity {
     public void setSourceRecordId(Long sourceRecordId) {
         this.sourceRecordId = sourceRecordId;
     }
-
-
 
     /**
      *
@@ -147,7 +148,13 @@ public class KpiScore extends BaseEntity {
         return batchNo;
     }
 
+    public List<Long> getUserIds() {
+        return userIds;
+    }
 
+    public void setUserIds(List<Long> userIds) {
+        this.userIds = userIds;
+    }
 
     @Override
     public String toString() {

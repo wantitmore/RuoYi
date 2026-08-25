@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.biz.kpi.service.impl;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -122,5 +123,26 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
     @Override
     public List<KpiScoreDetailVo> selectAllDetail(List<String> months, Long deptId, Long postId) {
         return kpiScoreMapper.selectAllDetail(months, deptId, postId);
+    }
+
+    @Override
+    public BigDecimal calcTotalScoreMinus100(Long userId, String batchNo) {
+        KpiScore query = new KpiScore();
+        query.setUserId(userId);
+        query.setBatchNo(batchNo);
+        List<KpiScore> list = kpiScoreMapper.selectKpiScoreList(query);
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (KpiScore score : list) {
+            if (score.getScore() != null) {
+                total = total.add(score.getScore());
+            }
+        }
+        return total;
+    }
+
+    @Override
+    public List<Long> selectUserIdsByBatchNoAndDept(Long deptId, String batchNo) {
+        return kpiScoreMapper.selectUserIdsByBatchNoAndDept(deptId, batchNo);
     }
 }

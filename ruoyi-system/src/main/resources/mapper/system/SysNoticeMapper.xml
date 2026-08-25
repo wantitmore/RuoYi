@@ -39,6 +39,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="createBy != null and createBy != ''">
 				AND create_by like concat('%', #{createBy}, '%')
 			</if>
+            <if test='noticeType == "3" and params != null and params.containsKey("userId")'>
+                            AND (
+                                notice_id IN (
+                                    SELECT notice_id 
+                                    FROM sys_notice_receiver 
+                                    WHERE user_id = #{params.userId}
+                                )
+                        <if test="params.isAdmin == true">
+                    </if>
+                )
+            </if>
 		</where>
 		order by notice_id desc
     </select>

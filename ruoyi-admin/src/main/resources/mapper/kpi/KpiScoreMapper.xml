@@ -31,6 +31,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="score != null "> and score = #{score}</if>
             <if test="batchNo != null  and batchNo != ''"> and batch_no = #{batchNo}</if>
             <if test="remark != null  and remark != ''"> and remark = #{remark}</if>
+            <if test="userIds != null and userIds.size() > 0">
+            and user_id in
+            <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+            </foreach>
+        </if>
         </where>
     </select>
     
@@ -103,6 +109,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND up.post_id = #{postId}
         </if>
         ORDER BY k.batch_no, u.user_name
+    </select>
+
+    <select id="selectUserIdsByBatchNoAndDept" resultType="java.lang.Long">
+        SELECT DISTINCT k.user_id
+        FROM kpi_score k
+        JOIN sys_user u ON k.user_id = u.user_id
+        WHERE k.batch_no = #{batchNo}
+        AND u.dept_id = #{deptId}
     </select>
 
     <insert id="insertKpiScore" parameterType="KpiScore" useGeneratedKeys="true" keyProperty="id">
