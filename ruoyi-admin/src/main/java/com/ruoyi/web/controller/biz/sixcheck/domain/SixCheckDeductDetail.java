@@ -18,6 +18,8 @@ public class SixCheckDeductDetail extends BaseEntity {
     private Long sixCheckRecordId;
     private BigDecimal deductScore;
     private String sourceType;
+    private String createByName;
+
 
     public Long getSixCheckRecordId() {
         return sixCheckRecordId;
@@ -73,6 +75,14 @@ public class SixCheckDeductDetail extends BaseEntity {
 
     public void setSourceType(String sourceType) {
         this.sourceType = sourceType;
+    }
+
+    public String getCreateByName() {
+        return createByName;
+    }
+
+    public void setCreateByName(String createByName) {
+        this.createByName = createByName;
     }
 
 }

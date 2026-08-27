@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考核评分 - 明细追踪演示</title>
+    <!-- Bootstrap 4 样式 (仅用于演示) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <!-- Font Awesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        body { background: #f5f7fa; padding: 20px; font-family: "Microsoft YaHei", sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .score-row { display: flex; border-bottom: 1px solid #e8ecf1; }
+        .score-header { background: #f0f3f7; font-weight: bold; position: sticky; top: 0; z-index: 10; }
+        .score-cell { padding: 8px 4px; flex: 1; min-width: 60px; text-align: center; border-right: 1px solid #e8ecf1; word-break: break-all; }
+        .score-cell:last-child { border-right: none; }
+        .score-cell.person { flex: 1.2; min-width: 80px; text-align: left; padding-left: 10px; }
+        .score-cell.total { flex: 0.8; min-width: 60px; background: #fafafa; font-weight: bold; color: #2c3e50; }
+        .score-display { cursor: pointer; display: inline-block; padding: 2px 12px; border-radius: 12px; background: #eef2f7; transition: 0.2s; }
+        .score-display:hover { background: #d4e2f0; transform: scale(1.05); }
+        .detail-modal .modal-dialog { max-width: 700px; }
+        .detail-list .badge-status { font-size: 12px; padding: 4px 8px; border-radius: 12px; }
+        .badge-status.effective { background: #d4edda; color: #155724; }
+        .badge-status.revoked { background: #f8d7da; color: #721c24; }
+        .table th, .table td { vertical-align: middle; text-align: center; }
+        .add-detail-area { background: #f8f9fc; padding: 15px; border-radius: 6px; }
+        .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+        .text-muted { font-size: 12px; color: #6c757d; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h3><i class="fa fa-table"></i> 月度考核评分表 <span style="font-size:14px;color:#888;margin-left:20px;">点击分数查看明细</span></h3>
+    <div style="margin-bottom:15px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+        <span><strong>部门：</strong>一区</span>
+        <span><strong>月份：</strong>2026-08</span>
+        <span><strong>考核项：</strong>常规考核</span>
+    </div>
+
+    <!-- 表格 -->
+    <div id="scoreTableWrapper" style="overflow-x:auto;">
+        <div id="scoreTable">
+            <!-- 表头 -->
+            <div class="score-row score-header">
+                <div class="score-cell person">人员</div>
+                <div class="score-cell item">工作态度</div>
+                <div class="score-cell item">任务完成</div>
+                <div class="score-cell item">团队协作</div>
+                <div class="score-cell total">总分</div>
+            </div>
+            <!-- 数据行 1 -->
+            <div class="score-row" data-user-id="101">
+                <div class="score-cell person">张三</div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('张三','工作态度')">-2.0</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('张三','任务完成')">1.5</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('张三','团队协作')">0.0</span></div>
+                <div class="score-cell total">-0.5</div>
+            </div>
+            <!-- 数据行 2 -->
+            <div class="score-row" data-user-id="102">
+                <div class="score-cell person">李四</div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('李四','工作态度')">0.0</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('李四','任务完成')">3.0</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('李四','团队协作')">-1.0</span></div>
+                <div class="score-cell total">2.0</div>
+            </div>
+            <!-- 数据行 3 -->
+            <div class="score-row" data-user-id="103">
+                <div class="score-cell person">王五</div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('王五','工作态度')">-3.5</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('王五','任务完成')">2.0</span></div>
+                <div class="score-cell item"><span class="score-display" onclick="openDetailModal('王五','团队协作')">0.5</span></div>
+                <div class="score-cell total">-1.0</div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top:15px; color:#666; font-size:13px;">
+        <i class="fa fa-info-circle"></i> 点击分数即可查看该考核项的加减分明细，并支持新增或撤销。
+    </div>
+</div>
+
+<!-- ========== 明细弹窗 ========== -->
+<div class="modal fade detail-modal" id="detailModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title"><i class="fa fa-list-ul"></i> 明细记录 — <span id="modalPerson"></span> — <span id="modalItem"></span></h4>
+            </div>
+            <div class="modal-body">
+                <!-- 明细列表 -->
+                <div id="detailListContainer">
+                    <table class="table table-bordered table-striped detail-list">
+                        <thead>
+                            <tr><th>#</th><th>分数</th><th>备注</th><th>操作人</th><th>时间</th><th>状态</th><th>操作</th></tr>
+                        </thead>
+                        <tbody id="detailTableBody">
+                            <!-- 由 js 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 新增区域 -->
+                <hr>
+                <div class="add-detail-area">
+                    <div class="form-row align-items-center">
+                        <div class="col-auto">
+                            <label class="sr-only">分数</label>
+                            <input type="number" class="form-control form-control-sm" id="newDetailScore" step="0.5" placeholder="分数 (正加负扣)" style="width:140px;">
+                        </div>
+                        <div class="col-auto">
+                            <label class="sr-only">备注</label>
+                            <input type="text" class="form-control form-control-sm" id="newDetailRemark" placeholder="原因说明" style="width:200px;">
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary btn-sm" onclick="submitNewDetail()"><i class="fa fa-plus"></i> 添加明细</button>
+                        </div>
+                    </div>
+                    <small class="text-muted">输入非零分数和备注，点击添加即生效，并自动更新总分。</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 模拟数据 ========== -->
+<script>
+    // 模拟明细数据（按用户+考核项分组）
+    var mockDetails = {
+        '张三_工作态度': [
+            { id: 1, deductScore: -2.0, deductInfo: '迟到两次', createBy: 'admin', createTime: '2026-08-10 09:30', status: 1 },
+            { id: 2, deductScore: -1.0, deductInfo: '未按时提交报告', createBy: 'admin', createTime: '2026-08-12 14:20', status: 0 }
+        ],
+        '张三_任务完成': [
+            { id: 3, deductScore: 1.5, deductInfo: '提前完成项目', createBy: 'admin', createTime: '2026-08-15 10:00', status: 1 }
+        ],
+        '张三_团队协作': [],
+        '李四_工作态度': [],
+        '李四_任务完成': [
+            { id: 4, deductScore: 3.0, deductInfo: '超额完成指标', createBy: 'admin', createTime: '2026-08-18 16:45', status: 1 }
+        ],
+        '李四_团队协作': [
+            { id: 5, deductScore: -1.0, deductInfo: '未参与团队会议', createBy: 'admin', createTime: '2026-08-20 11:00', status: 1 }
+        ],
+        '王五_工作态度': [
+            { id: 6, deductScore: -3.5, deductInfo: '多次旷工', createBy: 'admin', createTime: '2026-08-05 08:00', status: 1 },
+            { id: 7, deductScore: 1.0, deductInfo: '积极整改', createBy: 'admin', createTime: '2026-08-22 09:00', status: 1 }
+        ],
+        '王五_任务完成': [
+            { id: 8, deductScore: 2.0, deductInfo: '完成关键任务', createBy: 'admin', createTime: '2026-08-19 13:30', status: 1 }
+        ],
+        '王五_团队协作': [
+            { id: 9, deductScore: 0.5, deductInfo: '协助同事', createBy: 'admin', createTime: '2026-08-25 15:00', status: 1 }
+        ]
+    };
+
+    var currentPerson = '', currentItem = '';
+
+    function openDetailModal(person, item) {
+        currentPerson = person;
+        currentItem = item;
+        $('#modalPerson').text(person);
+        $('#modalItem').text(item);
+        renderDetails(person, item);
+        $('#detailModal').modal('show');
+        // 清空输入框
+        $('#newDetailScore').val('');
+        $('#newDetailRemark').val('');
+    }
+
+    function renderDetails(person, item) {
+        var key = person + '_' + item;
+        var list = mockDetails[key] || [];
+        var html = '';
+        if (list.length === 0) {
+            html = '<tr><td colspan="7" class="text-muted">暂无明细记录</td></tr>';
+        } else {
+            list.forEach(function(d, idx) {
+                var statusText = d.status === 1 ? '有效' : '已撤销';
+                var badgeClass = d.status === 1 ? 'effective' : 'revoked';
+                var revokeBtn = d.status === 1 ? '<button class="btn btn-xs btn-danger" onclick="revokeDetail(\'' + person + '\',\'' + item + '\',' + d.id + ')">撤销</button>' : '';
+                html += '<tr>';
+                html += '<td>' + (idx+1) + '</td>';
+                html += '<td>' + d.deductScore + '</td>';
+                html += '<td>' + (d.deductInfo || '') + '</td>';
+                html += '<td>' + d.createBy + '</td>';
+                html += '<td>' + d.createTime + '</td>';
+                html += '<td><span class="badge-status ' + badgeClass + '">' + statusText + '</span></td>';
+                html += '<td>' + revokeBtn + '</td>';
+                html += '</tr>';
+            });
+        }
+        $('#detailTableBody').html(html);
+    }
+
+    function submitNewDetail() {
+        var score = parseFloat($('#newDetailScore').val());
+        var remark = $('#newDetailRemark').val().trim();
+        if (isNaN(score) || score === 0) {
+            alert('请输入有效的分数（非零）');
+            return;
+        }
+        if (!remark) {
+            alert('请输入备注');
+            return;
+        }
+        // 模拟添加
+        var key = currentPerson + '_' + currentItem;
+        if (!mockDetails[key]) mockDetails[key] = [];
+        var newId = Date.now();
+        mockDetails[key].push({
+            id: newId,
+            deductScore: score,
+            deductInfo: remark,
+            createBy: 'admin',
+            createTime: new Date().toLocaleString('zh-CN'),
+            status: 1
+        });
+        renderDetails(currentPerson, currentItem);
+        // 模拟更新总分（简单刷新页面上的总分显示，实际项目中通过后端重新计算）
+        alert('添加成功！总分已自动更新（演示中未实际修改总分）');
+        // 此处可重新加载表格总分，演示略
+    }
+
+    function revokeDetail(person, item, detailId) {
+        if (!confirm('确认撤销该明细吗？')) return;
+        var key = person + '_' + item;
+        var list = mockDetails[key] || [];
+        var found = false;
+        for (var i=0; i<list.length; i++) {
+            if (list[i].id === detailId && list[i].status === 1) {
+                list[i].status = 0;
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            renderDetails(person, item);
+            alert('已撤销，总分将自动更新（演示中未实际修改总分）');
+        } else {
+            alert('操作失败，明细不存在或已撤销');
+        }
+    }
+
+    // 阻止弹窗内点击关闭事件冒泡
+    $(document).on('click', '#detailModal', function(e) {
+        if ($(e.target).is('.modal')) {
+            // 点击背景关闭弹窗（默认行为），无需额外处理
+        }
+    });
+
+    // 确保jQuery和Bootstrap已加载
+    $(function() {
+        // 预置一些演示数据，已在上方mockDetails中定义
+        console.log('考核明细演示已启动，点击分数体验！');
+    });
+</script>
+
+<!-- jQuery 和 Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

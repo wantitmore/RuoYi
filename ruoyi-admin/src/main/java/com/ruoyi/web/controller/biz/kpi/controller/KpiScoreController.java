@@ -8,12 +8,14 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -25,6 +27,7 @@ import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -333,14 +336,10 @@ public class KpiScoreController extends BaseController {
         KpiItem queryItem = new KpiItem();
         queryItem.setDeptId(deptId);
         List<KpiItem> items = kpiItemService.selectKpiItemList(queryItem);
-        // 临时硬编码过滤验证
         if (category != null && !category.isEmpty()) {
             items = items.stream()
                     .filter(i -> category.equals(i.getCategory()))
                     .collect(Collectors.toList());
-        }
-        if (category != null && !category.isEmpty()) {
-            queryItem.setCategory(category);
         }
         items.sort(Comparator.comparing(KpiItem::getCategory));
 
@@ -348,19 +347,29 @@ public class KpiScoreController extends BaseController {
         SysUser queryUser = new SysUser();
         queryUser.setDeptId(deptId);
         List<SysUser> users = userService.selectUserList(queryUser);
+        List<Long> userIds = users.stream().map(SysUser::getUserId).collect(Collectors.toList());
 
-        // 3. 查询该批次下已保存的分数
-        KpiScore queryScore = new KpiScore();
-        queryScore.setBatchNo(batchNo);
-        List<KpiScore> existingScores = kpiScoreService.selectKpiScoreList(queryScore);
-        // 转成 Map<"userId_itemId", score> 方便前端查找
+        // 3. 查询该批次下已保存的分数（只查当前部门人员的）
         Map<String, Map<String, Object>> scoreMap = new HashMap<>();
-        for (KpiScore s : existingScores) {
-            if (/* StringUtils.isNotBlank(s.getRemark()) && */s.getScore() != null) {
-                Map<String, Object> detail = new HashMap<>();
-                detail.put("score", s.getScore() != null ? s.getScore() : 0);
-                detail.put("remark", s.getRemark() != null ? s.getRemark() : "");
-                scoreMap.put(s.getUserId() + "_" + s.getItemId(), detail);
+        if (!userIds.isEmpty()) {
+            KpiScore queryScore = new KpiScore();
+            queryScore.setBatchNo(batchNo);
+            queryScore.setUserIds(userIds); // 关键：只查当前部门人员的分数
+            List<KpiScore> existingScores = kpiScoreService.selectKpiScoreList(queryScore);
+            System.out.println("=== 查询到 " + existingScores.size() + " 条分数记录 ===");
+            for (KpiScore s : existingScores) {
+                if (s.getScore() != null) {
+                    Map<String, Object> detail = new HashMap<>();
+                    detail.put("score", s.getScore());
+                    detail.put("remark", s.getRemark() != null ? s.getRemark() : "");
+                    scoreMap.put(s.getUserId() + "_" + s.getItemId(), detail);
+                    System.out.println("  userId=" + s.getUserId()
+                            + ", itemId=" + s.getItemId() + ", score=" + s.getScore());
+                }
+            }
+            System.out.println("=== scoreMap 大小: " + scoreMap.size());
+            for (String key : scoreMap.keySet()) {
+                System.out.println("  key=" + key + " -> " + scoreMap.get(key));
             }
         }
 
@@ -399,13 +408,7 @@ public class KpiScoreController extends BaseController {
     public AjaxResult personDetail(@RequestParam String startMonth,
             @RequestParam String endMonth,
             @RequestParam Long userId) {
-        // 生成区间月份列表
         List<String> months = getMonthsBetween(startMonth, endMonth);
-        if (months.isEmpty()) {
-            return error("月份区间无效");
-        }
-
-        // 查询该用户在区间内所有考核记录
         List<KpiScore> list = kpiScoreService.selectByMonths(userId, months);
 
         List<Map<String, Object>> details = new ArrayList<>();
@@ -414,8 +417,31 @@ public class KpiScoreController extends BaseController {
             KpiItem kpiItem = kpiItemService.selectKpiItemById(score.getItemId());
             item.put("itemName", kpiItem != null ? kpiItem.getName() : "未知项目");
             item.put("score", score.getScore());
-            item.put("remark", score.getRemark() != null ? score.getRemark() : "");
             item.put("batchNo", score.getBatchNo());
+
+            // ========== 从明细表读取备注 ==========
+            // 查询该 kpi_score_id 下所有有效的明细备注
+            SixCheckDeductDetail detailQuery = new SixCheckDeductDetail();
+            detailQuery.setKpiScoreId(score.getId());
+            detailQuery.setStatus(1);
+            List<SixCheckDeductDetail> detailList = sixCheckDeductDetailService.selectList(detailQuery);
+
+            StringBuilder remarkBuilder = new StringBuilder();
+            if (!detailList.isEmpty()) {
+                for (SixCheckDeductDetail d : detailList) {
+                    if (StringUtils.isNotBlank(d.getDeductInfo())) {
+                        if (remarkBuilder.length() > 0) {
+                            remarkBuilder.append("\n");
+                        }
+                        remarkBuilder.append(d.getDeductInfo());
+                    }
+                }
+            }
+            // 如果没有明细备注，尝试从 kpi_score.remark 读取（兼容旧数据）
+            String remark = remarkBuilder.length() > 0 ? remarkBuilder.toString()
+                    : (score.getRemark() != null ? score.getRemark() : "");
+            item.put("remark", remark);
+
             details.add(item);
         }
         return success().put("data", details);
@@ -803,6 +829,172 @@ public class KpiScoreController extends BaseController {
         // 3. 预警检查
         checkAndSendWarning(dto.getUserId(), batchNo);
         return success("加扣分成功！").put("kpiScoreId", finalScoreId);
+    }
+
+    /**
+     * 查询某个考核项下的所有明细记录
+     */
+    @RequiresPermissions("kpi:score:edit")
+    @GetMapping("/detail/list")
+    @ResponseBody
+    public AjaxResult getDetailList(@RequestParam Long userId, @RequestParam Long itemId,
+            @RequestParam String batchNo) {
+        // 1. 查询 kpi_score 主记录
+        KpiScore query = new KpiScore();
+        query.setUserId(userId);
+        query.setItemId(itemId);
+        query.setBatchNo(batchNo);
+        List<KpiScore> scoreList = kpiScoreService.selectKpiScoreList(query);
+        if (scoreList.isEmpty()) {
+            return success(Collections.emptyList());
+        }
+        KpiScore kpiScore = scoreList.get(0);
+        Long kpiScoreId = kpiScore.getId();
+
+        // 2. 查询该 kpi_score 下的 manual 明细
+        SixCheckDeductDetail detailQuery = new SixCheckDeductDetail();
+        detailQuery.setKpiScoreId(kpiScoreId);
+        detailQuery.setSourceType("manual");
+        List<SixCheckDeductDetail> detailList = sixCheckDeductDetailService.selectList(detailQuery);
+
+        // 3. 如果没有 manual 明细，但 kpi_score 有分数，则虚拟构造一条（不存入数据库）
+        if (detailList.isEmpty() && kpiScore.getScore() != null
+                && kpiScore.getScore().compareTo(BigDecimal.ZERO) != 0) {
+            SixCheckDeductDetail virtual = new SixCheckDeductDetail();
+            virtual.setId(-1L); // 特殊标记
+            virtual.setDeductScore(kpiScore.getScore());
+            virtual.setDeductInfo(StringUtils.isNotBlank(kpiScore.getRemark()) ? kpiScore.getRemark() : "历史数据（无备注）");
+            virtual.setStatus(1);
+            virtual.setSourceType("manual");
+            virtual.setCreateBy(kpiScore.getCreateBy());
+            virtual.setCreateTime(kpiScore.getCreateTime());
+            // 设置一个虚拟 ID 让前端识别不可撤销
+            virtual.setId(-kpiScoreId); // 或任意负值
+            detailList = Collections.singletonList(virtual);
+        }
+
+        return success(detailList);
+    }
+
+    /**
+     * 手动录入一条考核明细（正数加分，负数扣分）
+     */
+    @RequiresPermissions("kpi:score:edit")
+    @PostMapping("/detail/addDetail")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult addDetail(
+            @RequestParam Long userId,
+            @RequestParam Long itemId,
+            @RequestParam String batchNo,
+            @RequestParam BigDecimal score,
+            @RequestParam String remark) {
+
+        // 1. 参数校验
+        if (score == null || score.compareTo(BigDecimal.ZERO) == 0) {
+            return error("分数不能为空或为0");
+        }
+        if (StringUtils.isBlank(remark)) {
+            return error("备注不能为空");
+        }
+
+        // 2. 获取或创建 kpi_score 主记录
+        KpiScore existQuery = new KpiScore();
+        existQuery.setUserId(userId);
+        existQuery.setItemId(itemId);
+        existQuery.setBatchNo(batchNo);
+        List<KpiScore> existList = kpiScoreService.selectKpiScoreList(existQuery);
+
+        Long kpiScoreId;
+        if (existList.isEmpty()) {
+            // 创建新记录（总分先为0，后面会重新计算）
+            KpiScore newScore = new KpiScore();
+            newScore.setUserId(userId);
+            newScore.setItemId(itemId);
+            newScore.setBatchNo(batchNo);
+            newScore.setScore(BigDecimal.ZERO);
+            newScore.setCreateBy(ShiroUtils.getLoginName());
+            kpiScoreService.insertKpiScore(newScore);
+            kpiScoreId = newScore.getId();
+        } else {
+            kpiScoreId = existList.get(0).getId();
+        }
+
+        // 3. 插入明细（source_type = 'manual'）
+        SixCheckDeductDetail detail = new SixCheckDeductDetail();
+        detail.setKpiScoreId(kpiScoreId);
+        detail.setDeductScore(score);
+        detail.setDeductInfo(remark);
+        detail.setStatus(1);
+        detail.setSourceType("manual");
+        detail.setCreateBy(ShiroUtils.getLoginName());
+        detail.setCreateTime(new Date());
+        sixCheckDeductDetailService.insert(detail);
+
+        // 4. 重新计算总分并更新 kpi_score
+        recalculateTotalScore(kpiScoreId);
+
+        // 5. 预警检查（扣分超过3分时触发）
+        if (score.compareTo(BigDecimal.ZERO) < 0) {
+            checkAndSendWarning(userId, batchNo);
+        }
+
+        return success("添加成功");
+    }
+
+    /**
+     * 撤销某条明细（软删除，status 置为 0）
+     */
+    @RequiresPermissions("kpi:score:edit")
+    @PostMapping("/detail/revokeDetail")
+    @ResponseBody
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult revokeDetail(@RequestParam Long detailId) {
+        // 1. 查询明细
+        SixCheckDeductDetail detail = sixCheckDeductDetailService.selectById(detailId);
+        if (detail == null) {
+            return error("明细不存在");
+        }
+        if (detail.getStatus() == 0) {
+            return error("该明细已被撤销");
+        }
+
+        // 2. 软删除
+        detail.setStatus(0);
+        detail.setUpdateBy(ShiroUtils.getLoginName());
+        detail.setUpdateTime(new Date());
+        sixCheckDeductDetailService.update(detail);
+
+        // 3. 重新计算该明细所属 kpi_score 的总分
+        recalculateTotalScore(detail.getKpiScoreId());
+
+        // 4. 重新检查预警（可能撤销后扣分低于阈值，但一般不需要撤回预警，故不处理）
+
+        return success("撤销成功");
+    }
+
+    /**
+     * 根据 kpi_score_id 重新计算总分（所有 status=1 的明细之和）
+     */
+    private void recalculateTotalScore(Long kpiScoreId) {
+        // 查询该 kpi_score_id 下所有有效明细的分数之和
+        SixCheckDeductDetail query = new SixCheckDeductDetail();
+        query.setKpiScoreId(kpiScoreId);
+        query.setStatus(1);
+        List<SixCheckDeductDetail> details = sixCheckDeductDetailService.selectList(query);
+        BigDecimal total = details.stream()
+                .map(SixCheckDeductDetail::getDeductScore)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 更新 kpi_score
+        KpiScore score = kpiScoreService.selectKpiScoreById(kpiScoreId);
+        if (score != null) {
+            score.setScore(total);
+            score.setUpdateBy(ShiroUtils.getLoginName());
+            score.setUpdateTime(new Date());
+            kpiScoreService.updateKpiScore(score);
+        }
     }
 
 }

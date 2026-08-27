@@ -220,7 +220,52 @@
             </div>
         </div>
     </div>
-
+    <div class="modal fade" id="detailModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">考核明细 - <span id="modalUserName"></span> - <span id="modalItemName"></span>
+                    </h4>
+                </div>
+                <div class="modal-body">
+                    <div id="detailListContainer">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>分数</th>
+                                    <th>备注</th>
+                                    <th>操作人</th>
+                                    <th>时间</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detailTableBody"></tbody>
+                        </table>
+                    </div>
+                    <hr>
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label>分数：</label>
+                            <input type="number" class="form-control" id="newDetailScore" step="0.5"
+                                placeholder="正数加分，负数扣分">
+                        </div>
+                        <div class="form-group" style="margin-left:10px;">
+                            <label>备注：</label>
+                            <input type="text" class="form-control" id="newDetailRemark" placeholder="原因说明">
+                        </div>
+                        <button class="btn btn-primary" onclick="submitNewDetail()"
+                            style="margin-left:10px;">添加明细</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div th:include="include :: footer"></div>
     <script th:inline="javascript">
         var ctx = [[@{/}]];
@@ -250,6 +295,7 @@
         });
 
         function loadTable() {
+             console.log("=== loadTable 被调用了 ===");  
             var deptId = $("#deptSelect").val();
             var batchNo = $("#batchNo").val();
             var category = $("#categorySelect").val();
@@ -257,6 +303,7 @@
                 alert("请选择部门和填写月份");
                 return;
             }
+
 
             $.get(ctx + "kpi/score/loadScoreTable", {
                 deptId: deptId,
@@ -283,6 +330,12 @@
                     if (data && data.remark) {
                         remarkCache[key] = data.remark;
                     }
+                }
+
+                // 构建 itemsMap（供弹窗使用）
+                window.itemsMap = {};
+                for (var i = 0; i < items.length; i++) {
+                    window.itemsMap[items[i].id] = items[i].name;
                 }
 
                 // 2. 构建表格 HTML
@@ -321,42 +374,52 @@
                         // 重要：在这里定义 readonlyAttr
                         var readonlyAttr = canEdit ? '' : 'readonly';
 
+                        for (var i = 0; i < items.length; i++) {
+                            window.itemsMap[items[i].id] = items[i].name;
+                        }
+
+                        // ========== 替换原来的输入框为只读分数（可点击） ==========
                         html += '<div class="score-cell item">' +
-                            '<div style="display:flex; align-items:center; gap:4px;">' +
-                            '<input type="number" class="form-control score-input" ' +
-                            'data-item-id="' + items[j].id + '" ' +
-                            'data-original-score="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
-                            'max="' + items[j].maxScore + '" min="-10" step="0.5" ' +
-                            'placeholder="-3至3分" ' +
-                            'value="' + (existingScore != null && existingScore !== '' ? existingScore : '') + '" ' +
-                            readonlyAttr + ' style="flex:1;">' +
-                            '<i class="fa fa-commenting-o ' + iconClass + '" ' +
-                            'data-item-id="' + items[j].id + '" ' +
-                            'data-remark="' + (existingRemark || '') + '" ' +
-                            'onclick="openRemarkPopover(this, \'' + user.userId + '\', \'' + items[j].id + '\')" ' +
-                            'style="cursor:pointer; font-size:16px; flex-shrink:0;"></i>' +
+                            '<div style="display:flex; align-items:center; justify-content:center; gap:4px;">' +
+                            '<span class="score-display" ' +
+                            'onclick="openDetailModal(\'' + user.userId + '\', \'' + items[j].id + '\', \'' + batchNo + '\')" ' +
+                            'style="cursor:pointer; display:inline-block; padding:4px 14px; border-radius:12px; background:#eef2f7; font-weight:500; min-width:50px; text-align:center;">' +
+                            (existingScore !== '' && existingScore != null ? parseFloat(existingScore).toFixed(1) : '0.0') +
+                            '</span>' +
                             '</div>' +
                             '</div>';
                     }
-                    html += '<div class="score-cell total total-score">' + (total > 0 ? total.toFixed(1) : '0') + '</div>';
+                    html += '<div class="score-cell total total-score">' + total.toFixed(1) + '</div>';
                     html += '</div>';
                 }
 
+                // ========== 诊断：检查键匹配情况 ==========
+                console.log("=== 键匹配诊断 ===");
+                var matchCount = 0;
+                var totalScoreSum = 0;
+                for (var u = 0; u < users.length; u++) {
+                    var user = users[u];
+                    var userTotal = 0;
+                    for (var j = 0; j < items.length; j++) {
+                        var key = user.userId + '_' + items[j].id;
+                        var scoreData = scoreMap[key];
+                        if (scoreData && scoreData.score != null) {
+                            matchCount++;
+                            userTotal += parseFloat(scoreData.score);
+                        }
+                    }
+                    totalScoreSum += userTotal;
+                    console.log("用户 " + user.userName + " 的总分:", userTotal, "，匹配了 " + (userTotal > 0 ? "有分数" : "无分数"));
+                }
+                console.log("总匹配次数:", matchCount);
+                console.log("所有用户总分之和:", totalScoreSum);
+
                 $("#scoreTable").html(html);
                 $("#scoreTableWrapper, #submitDiv").show();
-                $(".score-row").each(function () {
-                    var row = $(this);
-                    var total = 0;
-                    row.find('.score-input').each(function () {
-                        var v = parseFloat($(this).val());
-                        if (!isNaN(v)) total += v;
-                    });
-                    row.find('.total-score').text(total.toFixed(1));
-                });
 
                 // 绑定输入事件（总分计算 + 超限提醒）
                 $(".score-input").off('input').on('input', function () {
-                    var max = parseFloat($(this).attr('max'));
+                    /* var max = parseFloat($(this).attr('max'));
                     var val = parseFloat($(this).val());
                     if (!isNaN(val) && val > max) {
                         $(this).css('background-color', '#ffe6e6');
@@ -369,8 +432,106 @@
                         var v = parseFloat($(this).val());
                         if (!isNaN(v)) total += v;
                     });
-                    row.find('.total-score').text(total.toFixed(1));
+                    row.find('.total-score').text(total.toFixed(1)); */
                 });
+                console.log("=== loadTable 调试信息 ===");
+                console.log("category:", category);
+                console.log("items 列表:", items);
+                console.log("items 数量:", items.length);
+                console.log("users 列表:", users);
+                console.log("scoreMap:", scoreMap);
+                console.log("scoreMap 键列表:", Object.keys(scoreMap));
+            });
+        }
+        
+        var currentDetailUserId, currentDetailItemId, currentDetailBatchNo;
+        var itemsMap = {}; // 在 loadTable 中填充
+
+        function openDetailModal(userId, itemId, batchNo) {
+            currentDetailUserId = userId;
+            currentDetailItemId = itemId;
+            currentDetailBatchNo = batchNo;
+            // 获取用户名和考核项名
+            var userName = $('.score-row[data-user-id="' + userId + '"]').find('.person').text();
+            var itemName = itemsMap[itemId] || '未知项';
+            $('#modalUserName').text(userName);
+            $('#modalItemName').text(itemName);
+            loadDetails(userId, itemId, batchNo);
+            $('#detailModal').modal('show');
+        }
+
+        function loadDetails(userId, itemId, batchNo) {
+            $.get(ctx + 'kpi/score/detail/list', {
+                userId: userId,
+                itemId: itemId,
+                batchNo: batchNo
+            }, function (res) {
+                if (res.code === 0) {
+                    var html = '';
+                    var list = res.data || [];
+                    list.forEach(function (d, index) {
+                        html += '<tr>';
+                        html += '<td>' + (index + 1) + '</td>';
+                        html += '<td>' + d.deductScore + '</td>';
+                        html += '<td>' + (d.deductInfo || '') + '</td>';
+                        html += '<td>' + d.createBy + '</td>';
+                        html += '<td>' + d.createTime + '</td>';
+                        html += '<td>' + (d.status === 1 ? '有效' : '已撤销') + '</td>';
+                        html += '<td>';
+                        if (d.status === 1 && d.sourceType === 'manual' && d.id > 0) {
+                            html += '<button class="btn btn-xs btn-danger" onclick="revokeDetail(' + d.id + ')">撤销</button>';
+                        }
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    if (list.length === 0) {
+                        html = '<tr><td colspan="7" class="text-center">暂无明细记录</td></tr>';
+                    }
+                    $('#detailTableBody').html(html);
+                } else {
+                    alert('加载明细失败：' + res.msg);
+                }
+            });
+        }
+
+        function submitNewDetail() {
+            var score = parseFloat($('#newDetailScore').val());
+            var remark = $('#newDetailRemark').val().trim();
+            if (isNaN(score) || score === 0) {
+                alert('请输入有效的分数（非零）');
+                return;
+            }
+            if (!remark) {
+                alert('请输入备注');
+                return;
+            }
+            $.post(ctx + 'kpi/score/detail/addDetail', {
+                userId: currentDetailUserId,
+                itemId: currentDetailItemId,
+                batchNo: currentDetailBatchNo,
+                score: score,
+                remark: remark
+            }, function (res) {
+                if (res.code === 0) {
+                    $('#newDetailScore').val('');
+                    $('#newDetailRemark').val('');
+                    loadDetails(currentDetailUserId, currentDetailItemId, currentDetailBatchNo);
+                    loadTable(); // 刷新主表格总分
+                } else {
+                    alert('添加失败：' + res.msg);
+                }
+            });
+        }
+
+        function revokeDetail(detailId) {
+            if (!confirm('确认撤销该明细？')) return;
+            $.post(ctx + 'kpi/score/detail/revokeDetail', { detailId: detailId }, function (res) {
+                if (res.code === 0) {
+                    loadDetails(currentDetailUserId, currentDetailItemId, currentDetailBatchNo);
+                    loadTable();
+                } else {
+                    alert('撤销失败：' + res.msg);
+                }
             });
         }
 
@@ -449,7 +610,7 @@
         // ========== 提交保存 ==========
 
         function submitScores() {
-            var batchNo = $("#batchNo").val();
+/*             var batchNo = $("#batchNo").val();
             var scoreList = [];
 
             $(".score-row[data-user-id]").each(function () {
@@ -498,7 +659,7 @@
                         alert("保存失败：" + res.msg);
                     }
                 }
-            });
+            }); */
 
         }
     </script>

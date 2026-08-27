@@ -529,3 +529,18 @@ CREATE TABLE sys_notice_receiver (
     UNIQUE KEY uk_notice_user (notice_id, user_id)
 ) COMMENT='公告接收人表（用于控制可见性）';
 
+INSERT INTO six_check_deduct_detail 
+    (kpi_score_id, deduct_score, deduct_info, status, source_type, create_by, create_time)
+SELECT 
+    ks.id,
+    ks.score,
+    COALESCE(ks.remark, ''),
+    1,
+    'manual',
+    ks.create_by,
+    COALESCE(ks.create_time, NOW())
+FROM kpi_score ks
+LEFT JOIN six_check_deduct_detail d ON d.kpi_score_id = ks.id AND d.source_type = 'manual'
+WHERE d.id IS NULL
+  AND ks.score IS NOT NULL;
+
