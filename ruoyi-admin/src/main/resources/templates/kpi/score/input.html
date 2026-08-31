@@ -295,7 +295,7 @@
         });
 
         function loadTable() {
-             console.log("=== loadTable 被调用了 ===");  
+            console.log("=== loadTable 被调用了 ===");
             var deptId = $("#deptSelect").val();
             var batchNo = $("#batchNo").val();
             var category = $("#categorySelect").val();
@@ -335,7 +335,10 @@
                 // 构建 itemsMap（供弹窗使用）
                 window.itemsMap = {};
                 for (var i = 0; i < items.length; i++) {
-                    window.itemsMap[items[i].id] = items[i].name;
+                    window.itemsMap[items[i].id] = {
+                        name: items[i].name,
+                        category: items[i].category
+                    };
                 }
 
                 // 2. 构建表格 HTML
@@ -374,10 +377,6 @@
                         // 重要：在这里定义 readonlyAttr
                         var readonlyAttr = canEdit ? '' : 'readonly';
 
-                        for (var i = 0; i < items.length; i++) {
-                            window.itemsMap[items[i].id] = items[i].name;
-                        }
-
                         // ========== 替换原来的输入框为只读分数（可点击） ==========
                         html += '<div class="score-cell item">' +
                             '<div style="display:flex; align-items:center; justify-content:center; gap:4px;">' +
@@ -393,8 +392,7 @@
                     html += '</div>';
                 }
 
-                // ========== 诊断：检查键匹配情况 ==========
-                console.log("=== 键匹配诊断 ===");
+                // ========== 诊断：检查键匹配情况 =========
                 var matchCount = 0;
                 var totalScoreSum = 0;
                 for (var u = 0; u < users.length; u++) {
@@ -409,10 +407,7 @@
                         }
                     }
                     totalScoreSum += userTotal;
-                    console.log("用户 " + user.userName + " 的总分:", userTotal, "，匹配了 " + (userTotal > 0 ? "有分数" : "无分数"));
                 }
-                console.log("总匹配次数:", matchCount);
-                console.log("所有用户总分之和:", totalScoreSum);
 
                 $("#scoreTable").html(html);
                 $("#scoreTableWrapper, #submitDiv").show();
@@ -434,16 +429,9 @@
                     });
                     row.find('.total-score').text(total.toFixed(1)); */
                 });
-                console.log("=== loadTable 调试信息 ===");
-                console.log("category:", category);
-                console.log("items 列表:", items);
-                console.log("items 数量:", items.length);
-                console.log("users 列表:", users);
-                console.log("scoreMap:", scoreMap);
-                console.log("scoreMap 键列表:", Object.keys(scoreMap));
             });
         }
-        
+
         var currentDetailUserId, currentDetailItemId, currentDetailBatchNo;
         var itemsMap = {}; // 在 loadTable 中填充
 
@@ -451,9 +439,23 @@
             currentDetailUserId = userId;
             currentDetailItemId = itemId;
             currentDetailBatchNo = batchNo;
+            var itemInfo = window.itemsMap[itemId] || {};
+            var itemName = itemInfo.name || '未知项';
+            var category = itemInfo.category || '';
             // 获取用户名和考核项名
             var userName = $('.score-row[data-user-id="' + userId + '"]').find('.person').text();
-            var itemName = itemsMap[itemId] || '未知项';
+            // var itemName = itemsMap[itemId] || '未知项';
+            var scoreInput = $('#newDetailScore');
+            console.log("category is-- ", category);
+            if (category === '正面清单') {
+                scoreInput.attr('min', 0);
+                scoreInput.attr('max', 3);      // 允许加分
+                scoreInput.attr('placeholder', '');
+            } else {
+                scoreInput.attr('min', -3);
+                scoreInput.attr('max', 0);        // 只能扣分
+                scoreInput.attr('placeholder', '');
+            }
             $('#modalUserName').text(userName);
             $('#modalItemName').text(itemName);
             loadDetails(userId, itemId, batchNo);
@@ -610,56 +612,56 @@
         // ========== 提交保存 ==========
 
         function submitScores() {
-/*             var batchNo = $("#batchNo").val();
-            var scoreList = [];
-
-            $(".score-row[data-user-id]").each(function () {
-                var userId = $(this).data('user-id');
-                $(this).find('.score-input').each(function () {
-                    var $input = $(this);
-                    var rawVal = $input.val().trim();
-                    var itemId = $input.data('item-id');
-                    var originalVal = $input.data('original-score');   // 加载时的原始分数
-                    var remarkKey = userId + '_' + itemId;
-
-                    // 计算当前分数（null 代表清空）
-                    var score = (rawVal !== '') ? parseFloat(rawVal) : null;
-                    if (isNaN(score)) score = null;
-
-                    // 比较原始值和当前值：如果没变化，则跳过，不提交
-                    if (score === null && originalVal === '') return;      // 都是空，跳过
-                    //if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
-
-                    // 有变化（含清空）的条目才加入提交列表
-                    scoreList.push({
-                        userId: userId,
-                        itemId: itemId,
-                        score: score,
-                        batchNo: batchNo,
-                        remark: remarkCache[remarkKey] || ''
-                    });
-                });
-            });
-
-            if (scoreList.length === 0) {
-                alert("没有需要保存的修改");
-                return;
-            }
-
-            $.ajax({
-                url: ctx + "kpi/score/saveBatch",
-                type: "POST",
-                contentType: "application/json",
-                data: JSON.stringify(scoreList),
-                success: function (res) {
-                    if (res.code == 0) {
-                        alert("保存成功！");
-                        loadTable();   // 刷新表格
-                    } else {
-                        alert("保存失败：" + res.msg);
-                    }
-                }
-            }); */
+            /*             var batchNo = $("#batchNo").val();
+                        var scoreList = [];
+            
+                        $(".score-row[data-user-id]").each(function () {
+                            var userId = $(this).data('user-id');
+                            $(this).find('.score-input').each(function () {
+                                var $input = $(this);
+                                var rawVal = $input.val().trim();
+                                var itemId = $input.data('item-id');
+                                var originalVal = $input.data('original-score');   // 加载时的原始分数
+                                var remarkKey = userId + '_' + itemId;
+            
+                                // 计算当前分数（null 代表清空）
+                                var score = (rawVal !== '') ? parseFloat(rawVal) : null;
+                                if (isNaN(score)) score = null;
+            
+                                // 比较原始值和当前值：如果没变化，则跳过，不提交
+                                if (score === null && originalVal === '') return;      // 都是空，跳过
+                                //if (score !== null && String(score) === String(originalVal)) return; // 数字相同，跳过
+            
+                                // 有变化（含清空）的条目才加入提交列表
+                                scoreList.push({
+                                    userId: userId,
+                                    itemId: itemId,
+                                    score: score,
+                                    batchNo: batchNo,
+                                    remark: remarkCache[remarkKey] || ''
+                                });
+                            });
+                        });
+            
+                        if (scoreList.length === 0) {
+                            alert("没有需要保存的修改");
+                            return;
+                        }
+            
+                        $.ajax({
+                            url: ctx + "kpi/score/saveBatch",
+                            type: "POST",
+                            contentType: "application/json",
+                            data: JSON.stringify(scoreList),
+                            success: function (res) {
+                                if (res.code == 0) {
+                                    alert("保存成功！");
+                                    loadTable();   // 刷新表格
+                                } else {
+                                    alert("保存失败：" + res.msg);
+                                }
+                            }
+                        }); */
 
         }
     </script>
