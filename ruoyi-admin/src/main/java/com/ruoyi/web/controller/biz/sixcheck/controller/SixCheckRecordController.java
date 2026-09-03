@@ -12,7 +12,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
@@ -245,7 +247,15 @@ public class SixCheckRecordController extends BaseController {
         result.put("dutyLeader", dutyLeader);
         result.put("kpiScoreMap", kpiScoreMap);
         result.put("recordIdMap", recordIdMap);
-        result.put("detailInfoList", detailInfoList); // 新增
+        result.put("detailInfoList", detailInfoList);
+        // 在 load 方法中增加查询
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        String dateStr = sdf.format(checkDate);
+        String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift);
+        System.out.println("lastUpdateBy is " + lastUpdateBy);
+        System.out.println("dateStr is " + dateStr + ", shift is " + shift);
+        // 放入返回结果
+        result.put("lastUpdateBy", lastUpdateBy != null ? lastUpdateBy : "--");
         return success().put("data", result);
     }
 
@@ -277,6 +287,16 @@ public class SixCheckRecordController extends BaseController {
         SysUser currentUser = ShiroUtils.getSysUser();
         if (!currentUser.isAdmin() && !currentUser.getDeptId().equals(targetUser.getDeptId())) {
             return error("无权撤销其他部门的扣分记录");
+        }
+
+        Subject subject = SecurityUtils.getSubject();
+
+        boolean isSelf = currentUser.equals(detail.getCreateBy());
+        boolean isAdmin = subject.hasRole("admin");
+        boolean isDeptAdmin = subject.hasRole("dept_manager");
+
+        if (!isSelf && !isAdmin && !isDeptAdmin) {
+            return AjaxResult.error("权限不足：只有本人、部门管理员可以撤销");
         }
 
         // 3. 通过 source_record_id 获取六必查记录ID
@@ -560,123 +580,6 @@ public class SixCheckRecordController extends BaseController {
         }
 
         return success().put("data", result);
-    }
-
-    /**
-     * 撤销关联扣分：清除六必查记录中的扣分描述，并删除考核打分中的扣分记录
-     */
-    /**
-     * 撤销扣分
-     * 通过六必查记录ID，反向恢复KPI分数
-     */
-    /**
-     * 撤销扣分（仅限六必查关联扣分）
-     * 支持两种入参方式：
-     * 1. 传 kpiScoreId：直接通过KPI记录ID撤销
-     * 2. 传 recordId：通过六必查记录ID撤销
-     */
-    @PostMapping("/cancelDeduct")
-    @ResponseBody
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
-        try {
-            // ========== 1. 获取参数 ==========
-            Long kpiScoreId = null;
-            if (params.get("kpiScoreId") != null) {
-                kpiScoreId = Long.valueOf(params.get("kpiScoreId").toString());
-                String deductInfo = params.get("deductInfo").toString();
-                System.out.println("=== 撤销参数: kpiScoreId=" + kpiScoreId + ", deductInfo=" + deductInfo);
-            }
-            if (kpiScoreId == null) {
-                return error("参数错误：缺少kpiScoreId");
-            }
-
-            String deductInfo = params.get("deductInfo") != null ? params.get("deductInfo").toString() : null;
-            if (deductInfo == null || deductInfo.isEmpty()) {
-                return error("参数错误：缺少扣分描述");
-            }
-
-            SysUser currentUser = ShiroUtils.getSysUser();
-            String loginName = currentUser.getLoginName();
-
-            System.out.println("=== 开始撤销扣分，kpiScoreId=" + kpiScoreId + ", 操作人=" + loginName);
-
-            // ========== 2. 查询 KPI 记录 ==========
-            KpiScore kpiScore = kpiScoreService.selectKpiScoreById(kpiScoreId);
-            if (kpiScore == null) {
-                return error("未找到考核记录，kpiScoreId=" + kpiScoreId);
-            }
-            System.out.println("=== 查询到 KPI 记录: id=" + kpiScore.getId()
-                    + ", score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
-
-            // ========== 3. 校验：只有六必查关联扣分才能撤销 (去掉校验)==========
-
-            // ========== 4. 幂等性校验 ==========
-            String remark = kpiScore.getRemark();
-            System.out.println("remark is " + remark + ", deductInfo is " + deductInfo);
-            if (remark == null || !remark.contains(deductInfo)) {
-                System.out.println("=== 幂等性校验失败: remark 为空或不包含 deductInfo");
-                return error("该扣分记录已撤销或不存在");
-            }
-
-            // ========== 5. 恢复分数 ==========
-            BigDecimal deductScore = extractScore(deductInfo);
-            // detail.setDeductScore(dto.getScore());
-            System.out.println("=== 解析 deductScore: " + deductScore);
-            if (deductScore.compareTo(BigDecimal.ZERO) == 0) {
-                return error("无法解析扣分分数");
-            }
-            BigDecimal originalScore = kpiScore.getScore();
-            BigDecimal newScore = originalScore.add(deductScore);
-            System.out
-                    .println("=== 分数变化: 原始=" + originalScore + ", deductScore=" + deductScore + ", 计算后新分数=" + newScore);
-
-            // ========== 6. 移除扣分描述 ==========
-            System.out.println("remark : " + remark + ", deductInfo " + deductInfo);
-            String newRemark = remark.replace(deductInfo, "").trim();
-            System.out.println("=== 移除前 remark: " + remark);
-            System.out.println("=== 移除后 newRemark: " + newRemark);
-            kpiScore.setRemark(newRemark.isEmpty() ? null : newRemark);
-            kpiScore.setScore(newRemark.isEmpty() ? null : newScore);
-            System.out.println("new remark is " + newRemark);
-            kpiScore.setUpdateBy(loginName);
-            kpiScoreService.updateKpiScore(kpiScore);
-            System.out.println("=== KPI 更新后: score=" + kpiScore.getScore() + ", remark=" + kpiScore.getRemark());
-
-            // ========== 7. 更新六必查记录（如果存在） ==========
-            Long recordId = kpiScore.getSourceRecordId();
-            System.out.println("=== source_record_id=" + recordId);
-            System.out.println("recordId: " + recordId);
-            if (recordId != null) {
-                SixCheckRecord record = sixCheckRecordService.selectSixCheckRecordById(recordId);
-                if (record != null) {
-                    String recordValue = record.getRecordValue();
-                    System.out.println("=== 六必查原始 recordValue: " + recordValue);
-                    if (recordValue != null && recordValue.contains(deductInfo)) {
-                        String newRecordValue = recordValue.replace(deductInfo, "").trim();
-                        System.out.println("=== 六必查新 recordValue: " + newRecordValue);
-                        record.setRecordValue(newRecordValue.isEmpty() ? "正常" : newRecordValue);
-                        record.setUpdateBy(loginName);
-                        sixCheckRecordService.updateSixCheckRecord(record);
-                    } else {
-                        System.out.println("=== 六必查 recordValue 不包含 deductInfo，跳过更新");
-                    }
-                }
-            }
-
-            System.out.println("=== 撤销成功：kpiScoreId=" + kpiScoreId
-                    + ", 恢复分数=" + deductScore.abs()
-                    + ", 新分数=" + newScore);
-
-            return success("撤销成功");
-
-        } catch (NumberFormatException e) {
-            System.err.println("=== 撤销异常: " + e.getMessage());
-            return error("参数格式错误");
-        } catch (Exception e) {
-            System.err.println("撤销扣分失败 " + e.getMessage());
-            return error("撤销失败：" + e.getMessage());
-        }
     }
 
     // ============================================================

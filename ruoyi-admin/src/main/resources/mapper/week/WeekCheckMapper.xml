@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.weekcheck.mapper.WeekCheckMapper">
+ <resultMap id="WeekCheckResult" type="com.ruoyi.web.controller.biz.weekcheck.domain.WeekCheck">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="week" column="week"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="fourKnow" column="four_know"/>
+        <result property="noBook" column="no_book"/>
+        <result property="keyPerson" column="key_person"/>
+        <result property="dutyFamiliar" column="duty_familiar"/>
+        <result property="knowledgeMastery" column="knowledge_mastery"/>
+        <result property="other" column="other"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <!-- ==================== 查询 ==================== -->
+
+    <select id="selectCheckList" resultMap="WeekCheckResult">
+        SELECT * FROM week_check
+        <where>
+            <if test="week != null and week != ''">
+                AND week = #{week}
+            </if>
+            <if test="deptId != null and deptId > 0">
+                AND dept_id = #{deptId}
+            </if>
+            <if test="createBy != null and createBy != ''">
+                AND create_by = #{createBy}
+            </if>
+        </where>
+        ORDER BY user_id ASC
+    </select>
+
+    <select id="selectByUserIdAndWeek" resultMap="WeekCheckResult">
+        SELECT * FROM week_check
+        WHERE user_id = #{userId} AND week = #{week}
+    </select>
+
+    <select id="selectByUserWeekAndCreator" resultMap="WeekCheckResult">
+        SELECT * FROM week_check
+        WHERE user_id = #{userId}
+          AND week = #{week}
+          AND create_by = #{createBy}
+    </select>
+
+    <select id="selectWeekCheckById" resultMap="WeekCheckResult">
+        SELECT * FROM week_check WHERE id = #{id}
+    </select>
+
+
+    <!-- ==================== 插入 ==================== -->
+
+    <insert id="insertWeekCheck" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO week_check (
+            user_id,
+            week,
+            dept_id,
+            four_know,
+            no_book,
+            key_person,
+            duty_familiar,
+            knowledge_mastery,
+            other,
+            create_by,
+            create_time
+        ) VALUES (
+            #{userId},
+            #{week},
+            #{deptId},
+            #{fourKnow},
+            #{noBook},
+            #{keyPerson},
+            #{dutyFamiliar},
+            #{knowledgeMastery},
+            #{other},
+            #{createBy},
+            sysdate()
+        )
+    </insert>
+
+    <!-- ==================== 更新 ==================== -->
+
+    <update id="updateWeekCheck">
+        UPDATE week_check
+        SET four_know       = #{fourKnow},
+            no_book         = #{noBook},
+            key_person      = #{keyPerson},
+            duty_familiar   = #{dutyFamiliar},
+            knowledge_mastery = #{knowledgeMastery},
+            other           = #{other},
+            update_by       = #{updateBy},
+            update_time     = sysdate()
+        WHERE id = #{id}
+    </update>
+
+    <!-- ==================== 批量插入或更新 ==================== -->
+
+    <insert id="batchInsertOrUpdate">
+        INSERT INTO week_check (
+            user_id,
+            week,
+            dept_id,
+            four_know,
+            no_book,
+            key_person,
+            duty_familiar,
+            other,
+            create_by,
+            create_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.userId},
+                #{item.week},
+                #{item.deptId},
+                #{item.fourKnow},
+                #{item.noBook},
+                #{item.keyPerson},
+                #{item.dutyFamiliar},
+                #{item.other},
+                #{item.createBy},
+                sysdate()
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            four_know       = VALUES(four_know),
+            no_book         = VALUES(no_book),
+            key_person      = VALUES(key_person),
+            duty_familiar   = VALUES(duty_familiar),
+            other           = VALUES(other),
+            update_by       = VALUES(create_by),
+            update_time     = sysdate()
+    </insert>
+
+    <!-- ==================== 删除 ==================== -->
+
+    <delete id="deleteByWeek">
+        DELETE FROM week_check WHERE week = #{week}
+    </delete>
+
+    <delete id="deleteByUserIdAndWeek">
+        DELETE FROM week_check WHERE user_id = #{userId} AND week = #{week}
+    </delete>
+
+</mapper>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('周检查')" />
+    <style>
+        .grade-select {
+            width: 100px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        #dataTable th {
+            position: sticky;
+            top: 0;
+            background: #f5f5f5;
+            z-index: 10;
+        }
+
+        #dataTable td:first-child,
+        #dataTable th:first-child {
+            position: sticky;
+            left: 0;
+            background: #fff;
+            z-index: 5;
+        }
+
+        .date-picker {
+            width: 160px;
+        }
+    </style>
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>周检查</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <!-- 筛选区 -->
+                        <div class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">检查周：</label>
+                                <div class="col-sm-2">
+                                    <input type="week" id="weekPicker" class="form-control date-picker" />
+                                </div>
+                                <label class="col-sm-1 control-label" style="display:none;">部门：</label>
+                                <div class="col-sm-2" style="display:none;">
+                                    <select id="deptSelect" class="form-control">
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
+                                <label class="col-sm-1 control-label" style="display: none;">岗位：</label>
+                                <div class="col-sm-2">
+                                    <select id="postSelect" class="form-control">
+                                        <option value="">全部岗位</option>
+                                        <option th:each="post : ${posts}" th:value="${post.postId}"
+                                            th:text="${post.postName}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-3">
+                                    <button class="btn btn-primary" onclick="loadData()">
+                                        <i class="fa fa-search"></i> 查询
+                                    </button>
+                                    <button class="btn btn-success" onclick="saveData()" th:if="${canEdit}">
+                                        <i class="fa fa-save"></i> 保存
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 矩阵表格 -->
+                        <div class="table-responsive" style="display:none;" id="tableWrapper">
+                            <table id="dataTable" class="table table-bordered table-hover">
+                                <thead id="tableHead"></thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var canEdit = [[${ canEdit }]];
+        var currentDeptId = [[${ currentDeptId }]];
+        var isZoneLeader = [[${ isZoneLeader }]];
+        var secPostId = [[${ secPostId }]];
+        var isDeptLeader = [[${ isDeptLeader }]];
+
+        // 初始化周选择器（默认为当前周）
+        $(function () {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = now.getMonth() + 1;
+            var day = now.getDate();
+            // 计算本周一的日期
+            var dayOfWeek = now.getDay() || 7; // 周日=7
+            var mondayOffset = dayOfWeek - 1;
+            var monday = new Date(year, month - 1, day - mondayOffset);
+            var y = monday.getFullYear();
+            var m = String(monday.getMonth() + 1).padStart(2, '0');
+            var d = String(monday.getDate()).padStart(2, '0');
+            $('#weekPicker').val(y + '-W' + getWeekNumber(monday));
+            if (isZoneLeader) {
+                $("#postSelect").hide();
+                $("label[for='postSelect']").hide();  // 如果label有for属性
+                // 或者直接隐藏整个容器
+                $(".post-filter").hide();
+            } else if (secPostId) {
+                $("#postSelect").val(secPostId);
+            }
+            loadData();
+        });
+
+        // 获取当前日期所在周数（ISO 8601）
+        function getWeekNumber(date) {
+            var d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            // 设置到周四
+            var day = d.getDay() || 7;
+            d.setDate(d.getDate() - day + 4);
+            var yearStart = new Date(d.getFullYear(), 0, 1);
+            var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return String(weekNo).padStart(2, '0');
+        }
+
+        function loadData() {
+            var weekVal = $("#weekPicker").val();
+            if (!weekVal) { alert("请选择检查周"); return; }
+            var currentWeek = getCurrentWeek();
+            var isEditable = (weekVal === currentWeek && canEdit);
+            // 将 weekVal (如 "2025-W12") 转换为该周周一日期，或直接传给后端
+            var deptId = $("#deptSelect").val();
+            var postId = $("#postSelect").val();
+            $.get(ctx + "week/data", {
+                week: weekVal,
+                deptId: currentDeptId,
+                postId: postId
+            }, function (res) {
+                if (res.code != 0) { alert("加载失败: " + res.msg); return; }
+                var rows = res.data.rows; // 每行包含 user 信息和各项评分
+                // 固定列：姓名、四知道、无册、重点人物掌握、两个职责熟悉情况、其他、日期（自动生成）
+                var columns = [
+                    { key: 'userName', label: '姓名' },
+                    { key: 'fourKnow', label: '四知道' },
+                    { key: 'noBook', label: '无册点名' },
+                    { key: 'keyPerson', label: '重点罪犯掌握情况' },
+                    { key: 'dutyFamiliar', label: '两个职责熟悉情况' },
+                    { key: 'knowledgeFamiliar', label: '应知应会掌握情况' },
+                    { key: 'other', label: '其他' },
+                    { key: 'checkDate', label: '日期' }
+                ];
+
+                // 构建表头
+                var headHtml = '<tr>';
+                $.each(columns, function (i, col) {
+                    headHtml += '<th>' + col.label + '</th>';
+                });
+                headHtml += '</tr>';
+                $("#tableHead").html(headHtml);
+
+                // 构建表体
+                var bodyHtml = '';
+                $.each(rows, function (i, row) {
+                    bodyHtml += '<tr>';
+                    $.each(columns, function (j, col) {
+                        var value = row[col.key] || '';
+                        if (col.key === 'userName') {
+                            bodyHtml += '<td>' + value + '</td>';
+                        } else if (col.key === 'checkDate') {
+                            bodyHtml += '<td>' + parseCSTDate(value) + '</td>';
+                        } else {
+                            // 评分项：下拉选择
+                            var selectName = col.key;
+                            bodyHtml += '<td>';
+                            bodyHtml += '<select class="form-control grade-select" data-user-id="' + row.userId + '" data-field="' + selectName + '" ' + (canEdit ? '' : 'disabled') + '>';
+                            bodyHtml += '<option value="">-</option>';
+                            bodyHtml += '<option value="好"' + (value === '好' ? ' selected' : '') + '>好</option>';
+                            bodyHtml += '<option value="较好"' + (value === '较好' ? ' selected' : '') + '>较好</option>';
+                            bodyHtml += '<option value="一般"' + (value === '一般' ? ' selected' : '') + '>一般</option>';
+                            bodyHtml += '<option value="差"' + (value === '差' ? ' selected' : '') + '>差</option>';
+                            bodyHtml += '</select>';
+                            bodyHtml += '</td>';
+                        }
+                    });
+                    bodyHtml += '</tr>';
+                });
+                $("#tableBody").html(bodyHtml);
+                $("#tableWrapper").show();
+                if (isEditable) {
+                    $(".btn-success").show();   // 显示保存按钮
+                } else {
+                    $(".btn-success").hide();   // 隐藏保存按钮
+                }
+            });
+        }
+
+        function parseCSTDate(dateStr) {
+            if (!dateStr) return '';
+            // 替换 CST 为 +0800（东八区）
+            var str = dateStr.replace('CST', '+0800');
+            var date = new Date(str);
+            if (isNaN(date.getTime())) return dateStr;
+
+            return date.getFullYear() + '-' +
+                String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                String(date.getDate()).padStart(2, '0') + ' ' +
+                String(date.getHours()).padStart(2, '0') + ':' +
+                String(date.getMinutes()).padStart(2, '0');
+        }
+
+        function saveData() {
+            if (!canEdit) { alert("没有编辑权限"); return; }
+            var weekVal = $("#weekPicker").val();
+            if (!weekVal) { alert("请选择检查周"); return; }
+            var deptId = $("#deptSelect").val();
+            var postId = $("#postSelect").val();
+
+            // 收集所有评分数据
+            var saveList = [];
+            $("tr", "#tableBody").each(function () {
+                var userId = $(this).find('.grade-select').data('user-id');
+                var rowData = { userId: userId };
+                var hasData = false;
+                $(this).find('.grade-select').each(function () {
+                    var field = $(this).data('field');
+                    var grade = $(this).val();
+                    rowData[field] = grade || '';
+                    if (grade) hasData = true;
+                });
+                if (hasData) {
+                    saveList.push(rowData);
+                }
+            });
+
+            if (saveList.length === 0) {
+                alert("没有可保存的数据");
+                return;
+            }
+
+            $.ajax({
+                url: ctx + "week/save",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    week: weekVal,
+                    postId: postId,
+                    deptId: currentDeptId,
+                    records: saveList
+                }),
+                success: function (res) {
+                    if (res.code == 0) {
+                        alert("保存成功");
+                        loadData();
+                    } else {
+                        alert("保存失败: " + res.msg);
+                    }
+                },
+                error: function () {
+                    alert("保存失败，请稍后重试");
+                }
+            });
+        }
+        function getCurrentWeek() {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = now.getMonth() + 1;
+            var day = now.getDate();
+            var dayOfWeek = now.getDay() || 7;
+            var mondayOffset = dayOfWeek - 1;
+            var monday = new Date(year, month - 1, day - mondayOffset);
+            var y = monday.getFullYear();
+            var m = String(monday.getMonth() + 1).padStart(2, '0');
+            var d = String(monday.getDate()).padStart(2, '0');
+            return y + '-W' + getWeekNumber(monday);
+        }
+    </script>
+</body>
+
+</html>

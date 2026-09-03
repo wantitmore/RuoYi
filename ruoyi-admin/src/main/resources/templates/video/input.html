@@ -240,7 +240,7 @@
             ).done(function (usersRes, itemsRes) {
                 var users = usersRes[0].data || [];
                 var items = itemsRes[0].data || [];
-
+                window._deductItems = items; 
                 var userOptions = '<option value="">请选择</option>';
                 $.each(users, function (i, u) {
                     userOptions += '<option value="' + u.userId + '">' + u.userName + '</option>';
@@ -283,7 +283,28 @@
                             alert("请填写完整信息");
                             return;
                         }
-
+                        var selectedItem = window._deductItems.find(function (it) { return it.id == itemId; });
+                        if (selectedItem) {
+                            if (selectedItem.category === '正面清单') {
+                                // 正面清单：0 ~ 3
+                                if (score < 0 || score > 3) {
+                                    alert('正面清单只能加0~3分，请重新输入');
+                                    return;
+                                }
+                            } else {
+                                // 其他类别：-3 ~ 0
+                                if (score < -3 || score > 0) {
+                                    alert('该类考核项只能扣分（-3 ~ 0分），不能加分');
+                                    return;
+                                }
+                            }
+                        } else {
+                            // 如果找不到项目，也做基本范围检查
+                            if (score < -3 || score > 3) {
+                                alert('分数必须在 -3 到 3 之间');
+                                return;
+                            }
+                        }
                         $.ajax({
                             url: ctx + "kpi/score/videoQuickDeduct",
                             type: "POST",
@@ -338,6 +359,33 @@
                                 });
                             }
                             itemSelect.html(html);
+                            $(layero).find('#deductScore').val('');
+                            $(layero).find('#deductItemId').on('change', function () {
+                                var itemId = $(this).val();
+                                var scoreInput = $(layero).find('#deductScore');
+                                if (itemId) {
+                                    var selectedItem = window._deductItems.find(function (it) { return it.id == itemId; });
+                                    if (selectedItem) {
+                                        if (selectedItem.category === '正面清单') {
+                                            scoreInput.attr('min', 0);
+                                            scoreInput.attr('max', 3);
+                                            scoreInput.attr('placeholder', '只能输入 0 ~ 3 分的加分');
+                                        } else {
+                                            scoreInput.attr('min', -3);
+                                            scoreInput.attr('max', 0);
+                                            scoreInput.attr('placeholder', '只能输入 -3 ~ 0 分的扣分');
+                                        }
+                                        // 清空之前输入的分数，避免超出范围
+                                        scoreInput.val('');
+                                    }
+                                } else {
+                                    // 未选择项目时恢复默认范围
+                                    scoreInput.attr('min', -3);
+                                    scoreInput.attr('max', 3);
+                                    scoreInput.attr('placeholder', '请先选择考核项目');
+                                    scoreInput.val('');
+                                }
+                            });
                         });
                     }
                 });
@@ -345,60 +393,6 @@
         }
 
         // 撤销关联扣分
-        function cancelDeduct(deductInfo, kpiScoreId, itemId) {
-            if (!kpiScoreId) {
-                alert("参数错误：缺少kpiScoreId");
-                return;
-            }
-            if (!confirm("确定要撤销这条扣分吗？\n" + deductInfo)) {
-                return;
-            }
-
-            $.ajax({
-                url: ctx + "video/record/cancelDeduct",
-                type: "POST",
-                contentType: "application/json",
-                data: JSON.stringify({
-                    itemId: itemId,
-                    deductInfo: deductInfo,
-                    kpiScoreId: kpiScoreId,
-                    batchNo: $("#batchNo").val()
-                }),
-                success: function (res) {
-                    if (res.code == 0) {
-                        alert("撤销成功");
-
-                        // 更新 textarea
-                        var textarea = $('textarea[data-item-id="' + itemId + '"]');
-                        if (textarea.length > 0) {
-                            var currentValue = textarea.val() || '';
-                            var lines = currentValue.split('\n');
-                            var newLines = [];
-                            for (var i = 0; i < lines.length; i++) {
-                                if (lines[i].trim().indexOf(deductInfo.trim()) !== -1) {
-                                    continue;
-                                }
-                                if (lines[i].trim()) {
-                                    newLines.push(lines[i]);
-                                }
-                            }
-                            var newValue = newLines.join('\n').trim();
-                            if (!newValue) {
-                                newValue = '正常';
-                            }
-                            textarea.val(newValue);
-                            // 自动保存
-                            saveData(true);
-                        }
-                    } else {
-                        alert("操作失败：" + res.msg);
-                    }
-                },
-                error: function (xhr) {
-                    alert("请求失败：" + xhr.status);
-                }
-            });
-        }
     </script>
 </body>
 

@@ -72,7 +72,9 @@ public class WarningNoticeService {
     }
 
     private void insertNoticeReadBatch(Long noticeId, List<Long> userIds) {
-        noticeReceiverMapper.batchInsert(noticeId, userIds);
+        if (userIds != null && !userIds.isEmpty()) {
+            noticeReceiverMapper.batchInsert(noticeId, userIds);
+        }
     }
 
     /**
@@ -154,5 +156,5 @@ public class WarningNoticeService {
 
         insertNoticeReadBatch(noticeId, receiverIds);
     }
-    
+
 }

@@ -544,3 +544,116 @@ LEFT JOIN six_check_deduct_detail d ON d.kpi_score_id = ks.id AND d.source_type 
 WHERE d.id IS NULL
   AND ks.score IS NOT NULL;
 
+-- ----------------------------
+-- 1. 周检查表
+-- ----------------------------
+DROP TABLE IF EXISTS `week_check`;
+CREATE TABLE `week_check` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `user_id` bigint(20) NOT NULL COMMENT '被考核用户ID',
+  `week` varchar(20) NOT NULL COMMENT '检查周（格式：2025-W12）',
+  `dept_id` bigint(20) NOT NULL COMMENT '部门ID（冗余，便于查询）',
+  `four_know` varchar(20) DEFAULT '' COMMENT '四知道（好/较好/一般/差）',
+  `no_book` varchar(20) DEFAULT '' COMMENT '无册点名（好/较好/一般/差）',
+  `key_person` varchar(20) DEFAULT '' COMMENT '重点罪犯掌握（好/较好/一般/差）',
+  `duty_familiar` varchar(20) DEFAULT '' COMMENT '两个职责熟悉情况（好/较好/一般/差）',
+  `other` varchar(20) DEFAULT '' COMMENT '其他（好/较好/一般/差）',
+  `knowledge_mastery` varchar(20) DEFAULT '' COMMENT '应知应会掌握情况',
+  `create_by` varchar(64) DEFAULT '' COMMENT '创建人（填表人登录名）',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_by` varchar(64) DEFAULT '' COMMENT '更新人',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_week_creator` (`user_id`, `week`, `create_by`),
+  KEY `idx_week` (`week`),
+  KEY `idx_dept_id` (`dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='周检查记录表';
+
+SET @kpi_menu_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '十个一目标考核' AND menu_type = 'M');
+INSERT INTO sys_menu (
+    menu_name,
+    parent_id,
+    order_num,
+    menu_type,
+    visible,
+    url,
+    perms,
+    icon,
+    create_by,
+    create_time,
+    update_by,
+    update_time,
+    remark
+) VALUES (
+    '周检查',
+    @kpi_menu_id,
+    7,                         
+    'C',
+    '0',
+    'week/list',
+    'week:view',
+    '#',                        
+    'admin',
+    NOW(),
+    '',
+    NULL,
+    '周检查模块'
+);
+
+SET @week_menu_id = LAST_INSERT_ID();
+INSERT INTO sys_menu (
+    menu_name,
+    parent_id,
+    order_num,
+    menu_type,
+    visible,
+    url,
+    perms,
+    icon,
+    create_by,
+    create_time,
+    update_by,
+    update_time,
+    remark
+) VALUES
+('周检查查询', @week_menu_id, 1, 'F', '0', '', 'week:list', '#', 'admin', NOW(), '', NULL, ''),
+('周检查新增', @week_menu_id, 2, 'F', '0', '', 'week:add', '#', 'admin', NOW(), '', NULL, ''),
+('周检查修改', @week_menu_id, 3, 'F', '0', '', 'week:edit', '#', 'admin', NOW(), '', NULL, ''),
+('周检查删除', @week_menu_id, 4, 'F', '0', '', 'week:remove', '#', 'admin', NOW(), '', NULL, '');
+
+-- =============================================
+-- 5. 授权给超级管理员（避免重复插入）
+-- =============================================
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id
+FROM sys_menu
+WHERE menu_name LIKE '%周检查%'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM sys_role_menu
+      WHERE role_id = 1
+        AND menu_id = sys_menu.menu_id
+  );
+
+ALTER TABLE week_check 
+ADD COLUMN `knowledge_mastery` VARCHAR(20) DEFAULT '' COMMENT '应知应会掌握情况（好/较好/一般/差）';
+
+SET @week_menu_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '周检查' AND menu_type = 'C');
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time)
+VALUES ('填表检查', @week_menu_id, 5, 'C', '0', 'week/check', 'week:check', '#', 'admin', NOW());
+
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT 1, menu_id FROM sys_menu WHERE perms = 'week:check'
+AND NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = 1 AND menu_id = sys_menu.menu_id);
+
+SET @week_menu_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '周检查' AND menu_type = 'C');
+
+-- 增加“填表”子菜单
+INSERT INTO sys_menu (
+    menu_name, parent_id, order_num, menu_type, visible, url, perms, icon, create_by, create_time
+) VALUES (
+    '填表', @week_menu_id, 6, 'C', '0', 'week/list', 'week:view', '#', 'admin', NOW()
+);
+
+

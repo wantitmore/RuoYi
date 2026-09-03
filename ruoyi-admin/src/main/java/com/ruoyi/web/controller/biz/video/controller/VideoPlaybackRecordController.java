@@ -6,7 +6,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -201,6 +204,16 @@ public class VideoPlaybackRecordController extends BaseController {
             return error("无权撤销其他部门的扣分记录");
         }
 
+        Subject subject = SecurityUtils.getSubject();
+
+        boolean isSelf = currentUser.equals(detail.getCreateBy());
+        boolean isAdmin = subject.hasRole("admin");
+        boolean isDeptAdmin = subject.hasRole("dept_manager");
+
+        if (!isSelf && !isAdmin && !isDeptAdmin) {
+            return AjaxResult.error("权限不足：只有本人、部门管理员可以撤销");
+        }
+
         BigDecimal deductScore = detail.getDeductScore();
         if (deductScore != null) {
             kpiScore.setScore(kpiScore.getScore().subtract(deductScore));
@@ -237,53 +250,6 @@ public class VideoPlaybackRecordController extends BaseController {
         System.out.println("撤销成功");
         detail.setUpdateBy(ShiroUtils.getLoginName());
         sixCheckDeductDetailService.update(detail);
-
-        return success("撤销成功");
-    }
-
-    @PostMapping("/cancelDeduct")
-    @ResponseBody
-    @Transactional(rollbackFor = Exception.class)
-    public AjaxResult cancelDeduct(@RequestBody Map<String, Object> params) {
-        Long kpiScoreId = Long.valueOf(params.get("kpiScoreId").toString());
-        String deductInfo = params.get("deductInfo").toString();
-        System.out.println("=== 撤销收到的 kpiScoreId = " + kpiScoreId);
-
-        // 1. 查询 KPI 记录
-        KpiScore kpiScore = kpiScoreService.selectKpiScoreById(kpiScoreId);
-        if (kpiScore == null) {
-            return error("未找到考核记录");
-        }
-
-        // 2. 通过 source_record_id 定位视频回放记录
-        Long videoRecordId = kpiScore.getSourceRecordId();
-        System.out.println("kpiScore " + kpiScore.toString());
-        if (videoRecordId != null) {
-            VideoPlaybackRecord videoRecord = videoPlaybackRecordService.selectVideoPlaybackRecordById(videoRecordId);
-            if (videoRecord != null) {
-                String newStatus = commonDeductService.removeDeductDesc(videoRecord.getPlaybackStatus(), deductInfo);
-                videoRecord.setPlaybackStatus(newStatus);
-                videoRecord.setUpdateBy(ShiroUtils.getLoginName());
-                videoPlaybackRecordService.updateVideoPlaybackRecord(videoRecord);
-            }
-        } else {
-            // 降级方案：按 itemId + batchNo 匹配（兼容旧数据）
-            // 但建议尽量保证 source_record_id 不为空
-            return error("未关联视频记录，无法撤销");
-        }
-
-        // 3. 恢复 KPI 分数
-        BigDecimal scoreChange = commonDeductService.parseScoreChange(deductInfo);
-        if (scoreChange != null) {
-            kpiScore.setScore(kpiScore.getScore().subtract(scoreChange)); // 反向操作
-            kpiScore.setUpdateBy(ShiroUtils.getLoginName());
-            kpiScoreService.updateKpiScore(kpiScore);
-        }
-
-        // 4. 从 KPI 备注中移除扣分描述
-        String newRemark = commonDeductService.removeDeductDesc(kpiScore.getRemark(), deductInfo);
-        kpiScore.setRemark(newRemark);
-        kpiScoreService.updateKpiScore(kpiScore);
 
         return success("撤销成功");
     }

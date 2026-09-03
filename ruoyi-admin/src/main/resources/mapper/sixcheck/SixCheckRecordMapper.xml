@@ -68,6 +68,17 @@
         </where>
     </select>
 
+    <select id="getLastUpdateBy" resultType="java.lang.String">
+        SELECT COALESCE(u2.user_name, u1.user_name)
+        FROM six_check_record r
+        LEFT JOIN sys_user u1 ON r.create_by = u1.login_name
+        LEFT JOIN sys_user u2 ON r.update_by = u2.login_name
+        WHERE r.check_date = #{checkDate}
+        AND r.shift = #{shift}
+        ORDER BY r.update_time DESC
+        LIMIT 1
+    </select>
+
     <!-- 插入（不变） -->
     <insert id="insertSixCheckRecord" parameterType="SixCheckRecord" useGeneratedKeys="true" keyProperty="id">
         insert into six_check_record

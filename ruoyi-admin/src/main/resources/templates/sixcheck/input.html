@@ -43,15 +43,20 @@
                                     </select>
                                 </div>
                                 <label class="col-sm-1 control-label">值班领导：</label>
-                                <div class="col-sm-2">
+                                <div class="col-sm-1">
                                     <input type="text" id="dutyLeader" class="form-control" required
                                         th:value="${currentUserName}" th:attr="data-default=${currentUserName}" />
                                 </div>
-                                <div class="col-sm-2">
+                                <div class="col-sm-1">
                                     <button class="btn btn-primary" onclick="loadData()">
-                                        <i class="fa fa-search"></i> 加载/刷新
+                                        <i class="fa fa-search"></i> 刷新
                                     </button>
                                 </div>
+                                <!-- <label class="col-sm-1 control-label">修改人：</label> -->
+                                <span
+                                    style="margin-left:15px; margin-top:6px; font-weight:bold; color:#337ab7; display:inline-block;">
+                                    修改人：<span id="lastUpdateBy" style="font-weight:normal;">--</span>
+                                </span>
                             </div>
                         </div>
                         <div class="table-responsive" style="display:none;" id="tableWrapper">
@@ -107,6 +112,8 @@
                 var kpiScoreMap = res.data.kpiScoreMap || {};
                 var dutyLeader = res.data.dutyLeader || '';
                 var detailInfoList = res.data.detailInfoList || []; // 新增：扣分明细列表
+                var lastUpdateBy = res.data.lastUpdateBy;
+                $("#lastUpdateBy").text(lastUpdateBy);
                 console.log("detailInfoList:", JSON.stringify(detailInfoList));
                 // 构建扣分明细映射：itemId + deductInfo -> detailId
                 var detailMap = {};
@@ -155,9 +162,9 @@
                             var detailId = detailMap[key] || '';
                             if (detailId && canEdit) {
                                 var displayText = deduct.length > 26 ? deduct.substring(0, 26) + '...' : deduct;
-                                idHtml += '<span class="label label-info" style="cursor:pointer; font-size:12px; margin:2px 4px 2px 0; display:inline-block;" title="' 
-                                + deduct.replace(/"/g, '&quot;') 
-                                + '" onclick="copyText(\'' + detailId + '\')">ID:' + detailId + '</span>';
+                                idHtml += '<span class="label label-info" style="cursor:pointer; font-size:12px; margin:2px 4px 2px 0; display:inline-block;" title="'
+                                    + deduct.replace(/"/g, '&quot;')
+                                    + '" onclick="copyText(\'' + detailId + '\')">ID:' + detailId + '</span>';
                             } /* else {
                                 idHtml += '<div style="margin:2px 0;">' + deduct + ' <span style="color:#999;">(无关联ID)</span></div>';
                             } */
@@ -261,7 +268,7 @@
         // 打开扣分弹窗
         function openDeductModal(checkItemName, defaultUserName, sixCheckItemId) {
             // 获取部门ID
-            var deptId = [[${ currentDeptId }]]; // 确保后端已传入 currentDeptId
+            var deptId = [[${ currentDeptId }]];
             if (!deptId) {
                 alert("无法获取部门信息");
                 return;
@@ -270,7 +277,7 @@
                 sixCheckItemId: sixCheckItemId,
                 checkDate: $("#checkDate").val(),
                 shift: $("#shift").val(),
-                currentValue: currentValue = $("#tableBody textarea[data-item-id='" + sixCheckItemId + "']").val() || '正常'
+                currentValue: $("#tableBody textarea[data-item-id='" + sixCheckItemId + "']").val() || '正常'
             };
 
             // 同时加载用户和考核项目
@@ -280,6 +287,9 @@
             ).done(function (usersRes, itemsRes) {
                 var users = usersRes[0].data || [];
                 var items = itemsRes[0].data || [];
+
+                // ========== 1. 保存到全局变量，供后续使用 ==========
+                window._deductItems = items;
 
                 // 渲染被考核人下拉
                 var userOptions = '<option value="">请选择</option>';
@@ -305,7 +315,7 @@
                     '<div class="form-group"><label class="col-sm-3 control-label">被考核人：</label><div class="col-sm-8"><select id="deductUserId" class="form-control">' + userOptions + '</select></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">考核类别：</label><div class="col-sm-8"><select id="deductCategory" class="form-control">' + catOptions + '</select></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">考核项目：</label><div class="col-sm-8"><select id="deductItemId" class="form-control"><option value="">请先选择类别</option></select></div></div>' +
-                    '<div class="form-group"><label class="col-sm-3 control-label">分数：</label><div class="col-sm-8"><input type="number" id="deductScore" class="form-control" step="0.5" min="-10" max="10" /></div></div>' +
+                    '<div class="form-group"><label class="col-sm-3 control-label">分数：</label><div class="col-sm-8"><input type="number" id="deductScore" class="form-control" step="0.5" min="-3" max="3" placeholder="请先选择考核项目" /></div></div>' +
                     '<div class="form-group"><label class="col-sm-3 control-label">备注：</label><div class="col-sm-8"><textarea id="deductRemark" class="form-control" rows="2"></textarea></div></div>' +
                     '</form></div>';
 
@@ -320,20 +330,47 @@
                     yes: function (index, layero) {
                         var userId = $(layero).find('#deductUserId').val();
                         var itemId = $(layero).find('#deductItemId').val();
-                        var score = $(layero).find('#deductScore').val();
+                        var score = parseFloat($(layero).find('#deductScore').val());
                         var remark = $(layero).find('#deductRemark').val();
-                        if (!userId || !itemId || !score) {
+                        if (!userId || !itemId || isNaN(score)) {
                             alert("请填写完整信息");
                             return;
                         }
+
+                        // ========== 2. 提交前校验分数范围 ==========
+                        // 查找当前选中的项目
+                        var selectedItem = window._deductItems.find(function (it) { return it.id == itemId; });
+                        if (selectedItem) {
+                            if (selectedItem.category === '正面清单') {
+                                // 正面清单：0 ~ 3
+                                if (score < 0 || score > 3) {
+                                    alert('正面清单只能加0~3分，请重新输入');
+                                    return;
+                                }
+                            } else {
+                                // 其他类别：-3 ~ 0
+                                if (score < -3 || score > 0) {
+                                    alert('该类考核项只能扣分（-3 ~ 0分），不能加分');
+                                    return;
+                                }
+                            }
+                        } else {
+                            // 如果找不到项目，也做基本范围检查
+                            if (score < -3 || score > 3) {
+                                alert('分数必须在 -3 到 3 之间');
+                                return;
+                            }
+                        }
+
+                        // 提交 AJAX
                         $.ajax({
                             url: ctx + "kpi/score/quickDeduct",
                             type: "POST",
                             contentType: "application/json",
                             data: JSON.stringify({
                                 userId: userId,
-                                itemId: $("#deductItemId").val(),
-                                score: parseFloat(score),
+                                itemId: itemId,
+                                score: score,
                                 remark: remark,
                                 sixCheckItemId: window._currentDeductInfo ? window._currentDeductInfo.sixCheckItemId : null,
                                 checkDate: window._currentDeductInfo ? window._currentDeductInfo.checkDate : null,
@@ -351,11 +388,6 @@
                                             textarea.val(res.data.finalValue);
                                         }
                                     }
-                                    var kpiScoreId = res.data ? res.data.kpiScoreId : res.kpiScoreId;;
-                                    //window._lastDeductKpiItemId = kpiItemId; // 在 yes 回调中设置
-                                    console.log("加扣分成功，kpiScoreId=" + kpiScoreId + ", res.kpiScoreId = " + res.kpiScoreId);
-                                    // loadData(kpiScoreId);
-
                                 } else {
                                     alert("操作失败：" + res.msg);
                                 }
@@ -366,6 +398,7 @@
                         layer.close(index);
                     },
                     success: function (layero, index) {
+                        // 类别切换时更新项目列表
                         $(layero).find('#deductCategory').on('change', function () {
                             var cat = $(this).val();
                             var itemSelect = $(layero).find('#deductItemId');
@@ -373,11 +406,41 @@
                             if (cat) {
                                 $.each(items, function (i, item) {
                                     if (item.category === cat) {
-                                        html += '<option value="' + item.id + '">' + item.name + ' </option>';
+                                        html += '<option value="' + item.id + '">' + item.name + '</option>';
                                     }
                                 });
                             }
                             itemSelect.html(html);
+                            // 清空分数输入框
+                            $(layero).find('#deductScore').val('');
+                        });
+
+                        // ========== 3. 项目下拉框 change 事件：动态设置分数范围 ==========
+                        $(layero).find('#deductItemId').on('change', function () {
+                            var itemId = $(this).val();
+                            var scoreInput = $(layero).find('#deductScore');
+                            if (itemId) {
+                                var selectedItem = window._deductItems.find(function (it) { return it.id == itemId; });
+                                if (selectedItem) {
+                                    if (selectedItem.category === '正面清单') {
+                                        scoreInput.attr('min', 0);
+                                        scoreInput.attr('max', 3);
+                                        scoreInput.attr('placeholder', '只能输入 0 ~ 3 分的加分');
+                                    } else {
+                                        scoreInput.attr('min', -3);
+                                        scoreInput.attr('max', 0);
+                                        scoreInput.attr('placeholder', '只能输入 -3 ~ 0 分的扣分');
+                                    }
+                                    // 清空之前输入的分数，避免超出范围
+                                    scoreInput.val('');
+                                }
+                            } else {
+                                // 未选择项目时恢复默认范围
+                                scoreInput.attr('min', -3);
+                                scoreInput.attr('max', 3);
+                                scoreInput.attr('placeholder', '请先选择考核项目');
+                                scoreInput.val('');
+                            }
                         });
                     }
                 });

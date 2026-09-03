@@ -456,6 +456,8 @@
                 scoreInput.attr('max', 0);        // 只能扣分
                 scoreInput.attr('placeholder', '');
             }
+            $('#newDetailScore').val('');
+            $('#newDetailRemark').val('');
             $('#modalUserName').text(userName);
             $('#modalItemName').text(itemName);
             loadDetails(userId, itemId, batchNo);
@@ -490,6 +492,7 @@
                         html = '<tr><td colspan="7" class="text-center">暂无明细记录</td></tr>';
                     }
                     $('#detailTableBody').html(html);
+
                 } else {
                     alert('加载明细失败：' + res.msg);
                 }

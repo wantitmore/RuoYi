@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:include="include :: header('周检查详情')" />
+    <style>
+        .table-responsive { overflow-x: auto; }
+        .info-bar {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+        .info-bar span {
+            margin-right: 30px;
+        }
+    </style>
+</head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-content">
+                        <!-- 顶部信息 -->
+                        <div id="infoBar" class="info-bar">
+                            <span>填表人：<b id="fillByName">-</b></span>
+                            <span>检查周：<b id="weekLabel">-</b></span>
+                            <span>部门：<b id="deptName">-</b></span>
+                            <span>已评人数：<b id="filledCount">-</b></span>
+                        </div>
+
+                        <!-- 表格 -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>姓名</th>
+                                        <th>四知道</th>
+                                        <th>无册点名</th>
+                                        <th>重点罪犯掌握</th>
+                                        <th>两个职责熟悉情况</th>
+                                        <th>应知应会掌握情况</th>
+                                        <th>其他</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div style="text-align:center;margin-top:15px;">
+                            <button class="btn btn-primary" onclick="parent.layer.closeAll()">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+
+        // 从 URL 获取参数
+        function getParam(name) {
+            var url = window.location.search;
+            var reg = new RegExp('[?&]' + name + '=([^&]+)');
+            var match = url.match(reg);
+            return match ? decodeURIComponent(match[1]) : null;
+        }
+
+        $(function() {
+            var loginName = getParam('loginName');
+            var week = getParam('week');
+            var deptId = getParam('deptId');
+
+            if (!loginName || !week || !deptId) {
+                alert('参数错误，缺少必要参数');
+                return;
+            }
+
+            // 加载数据
+            $.get(ctx + "week/detail", {
+                loginName: loginName,
+                week: week,
+                deptId: deptId
+            }, function(res) {
+                if (res.code != 0) {
+                    alert(res.msg || "加载失败");
+                    return;
+                }
+
+                var data = res.data;
+                var checks = data.checks || [];
+
+                // 填充头部信息
+                $("#fillByName").text(loginName);
+                $("#weekLabel").text(week);
+                $("#deptName").text(data.deptName || '-');
+                $("#filledCount").text(checks.length);
+
+                // 填充表格
+                var html = '';
+                if (checks.length === 0) {
+                    html = '<tr><td colspan="7" style="text-align:center;color:#bbb;">暂无数据</td></tr>';
+                } else {
+                    $.each(checks, function(i, row) {
+                        html += '<tr>';
+                        html += '<td>' + (row.userName || '-') + '</td>';
+                        html += '<td>' + (row.fourKnow || '-') + '</td>';
+                        html += '<td>' + (row.noBook || '-') + '</td>';
+                        html += '<td>' + (row.keyPerson || '-') + '</td>';
+                        html += '<td>' + (row.dutyFamiliar || '-') + '</td>';
+                        html += '<td>' + (row.knowledgeMastery || '-') + '</td>';
+                        html += '<td>' + (row.other || '-') + '</td>';
+                        html += '</tr>';
+                    });
+                }
+                $("#tableBody").html(html);
+            }).fail(function() {
+                alert("加载失败，请稍后重试");
+            });
+        });
+    </script>
+</body>
+
+</html>
+
+
+
+
+
+
+

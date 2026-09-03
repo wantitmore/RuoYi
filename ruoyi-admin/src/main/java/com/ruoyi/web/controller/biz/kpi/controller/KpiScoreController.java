@@ -29,6 +29,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -957,6 +958,17 @@ public class KpiScoreController extends BaseController {
         }
         if (detail.getStatus() == 0) {
             return error("该明细已被撤销");
+        }
+
+        String currentUser = ShiroUtils.getLoginName(); // 这个可以用，不动 ShiroUtils
+        Subject subject = SecurityUtils.getSubject();
+
+        // 3. 权限校验：本人 或 系统管理员 或 部门管理员
+        boolean isSelf = currentUser.equals(detail.getCreateBy());
+        boolean isAdmin = subject.hasRole("admin");
+        boolean isDeptAdmin = subject.hasRole("dept_manager");
+        if (!isSelf && !isAdmin && !isDeptAdmin) {
+            return AjaxResult.error("权限不足：只有本人、部门管理员可以撤销");
         }
 
         // 2. 软删除

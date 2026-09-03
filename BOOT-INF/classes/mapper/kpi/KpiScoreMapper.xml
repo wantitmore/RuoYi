@@ -22,20 +22,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             u.user_name AS userName,
             d.dept_name AS deptName,
             p.post_name AS postName,
-            SUM(s.score) AS totalScore,
+            COALESCE(SUM(s.score), 0) AS totalScore,
             COUNT(s.id) AS itemCount
-        FROM kpi_score s
-        JOIN sys_user u ON u.user_id = s.user_id
-        JOIN sys_dept d ON u.dept_id = d.dept_id
+        FROM sys_user u
+        LEFT JOIN sys_dept d ON u.dept_id = d.dept_id
         LEFT JOIN sys_user_post up ON u.user_id = up.user_id
         LEFT JOIN sys_post p ON up.post_id = p.post_id
-        WHERE s.batch_no = #{batchNo}
-        <if test="deptId != null">
-            AND u.dept_id = #{deptId}
-        </if>
-        <if test="postId != null">
-            AND up.post_id = #{postId}
-        </if>
+        LEFT JOIN kpi_score s ON u.user_id = s.user_id AND s.batch_no = #{batchNo}
+        <where>
+            u.del_flag = '0'
+            <if test="deptId != null">
+                AND u.dept_id = #{deptId}
+            </if>
+            <if test="postId != null">
+                AND up.post_id = #{postId}
+            </if>
+        </where>
         GROUP BY u.user_id, u.user_name, d.dept_name, p.post_name
         ORDER BY totalScore DESC
     </select>

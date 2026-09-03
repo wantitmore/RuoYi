@@ -64,4 +64,6 @@ public interface SixCheckRecordMapper
 
     List<SixCheckRecord> selectListByMonth(@Param("month") String month,
                                        @Param("deptId") Long deptId);
+
+    public String getLastUpdateBy(@Param("checkDate") String checkDate, @Param("shift") String shift);
 }

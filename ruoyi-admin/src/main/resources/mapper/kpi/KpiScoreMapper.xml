@@ -46,32 +46,35 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectAvgSummary" resultType="com.ruoyi.web.controller.biz.kpi.domain.ScoreSummary">
-            SELECT 
+        SELECT 
             u.user_id AS userId,
             u.user_name AS userName,
             d.dept_name AS deptName,
             p.post_name AS postName,
-            ROUND(100 + SUM(s.score) / COUNT(DISTINCT s.batch_no), 2) AS totalScore,
+            COALESCE(ROUND(100 + SUM(s.score) / NULLIF(COUNT(DISTINCT s.batch_no), 0), 2), 0) AS totalScore,
             COUNT(DISTINCT s.batch_no) AS itemCount
-        FROM kpi_score s
-        JOIN sys_user u ON u.user_id = s.user_id
-        JOIN sys_dept d ON u.dept_id = d.dept_id
+        FROM sys_user u
+        LEFT JOIN sys_dept d ON u.dept_id = d.dept_id
         LEFT JOIN sys_user_post up ON u.user_id = up.user_id
         LEFT JOIN sys_post p ON up.post_id = p.post_id
-        WHERE s.batch_no IN
-        <foreach collection="months" item="m" open="(" separator="," close=")">
-            #{m}
-        </foreach>
-        <if test="deptId != null">
-            AND u.dept_id = #{deptId}
-        </if>
-        <if test="postId != null">
-            AND up.post_id = #{postId}
-        </if>
+        LEFT JOIN kpi_score s ON u.user_id = s.user_id 
+            AND s.batch_no IN
+            <foreach collection="months" item="m" open="(" separator="," close=")">
+                #{m}
+            </foreach>
+        <where>
+            u.del_flag = '0'
+            <if test="deptId != null and deptId != ''">
+                AND u.dept_id = #{deptId}
+            </if>
+            <if test="postId != null and postId != ''">
+                AND up.post_id = #{postId}
+            </if>
+            AND p.post_name IN ('一分区管教员', '二分区管教员', '干事')
+        </where>
         GROUP BY u.user_id, u.user_name, d.dept_name, p.post_name
-        HAVING COUNT(DISTINCT s.batch_no) > 0
         ORDER BY totalScore DESC
-    </select>
+</select>
 
     <select id="selectByMonths" resultMap="KpiScoreResult">
         SELECT * FROM kpi_score
