@@ -12,8 +12,7 @@ import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
  * @author ruoyi
  * @date 2026-07-01
  */
-public interface SixCheckRecordMapper 
-{
+public interface SixCheckRecordMapper {
     /**
      * 查询六必查记录
      * 
@@ -63,7 +62,9 @@ public interface SixCheckRecordMapper
     public int deleteSixCheckRecordByIds(String[] ids);
 
     List<SixCheckRecord> selectListByMonth(@Param("month") String month,
-                                       @Param("deptId") Long deptId);
+            @Param("deptId") Long deptId);
 
-    public String getLastUpdateBy(@Param("checkDate") String checkDate, @Param("shift") String shift);
+    public String getLastUpdateBy(@Param("checkDate") String checkDate,
+            @Param("shift") String shift,
+            @Param("deptId") Long deptId);
 }

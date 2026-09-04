@@ -64,5 +64,5 @@ public interface ISixCheckRecordService
 
     public List<SixCheckRecord> selectListByMonth(@Param("month") String month, @Param("deptId") Long deptId);
 
-    public String getLastUpdateBy(String checkDate, String shift);
+    public String getLastUpdateBy(String checkDate, String shift, Long deptId);
 }

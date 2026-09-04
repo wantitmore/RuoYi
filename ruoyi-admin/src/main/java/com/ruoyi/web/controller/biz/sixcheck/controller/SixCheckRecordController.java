@@ -251,7 +251,8 @@ public class SixCheckRecordController extends BaseController {
         // 在 load 方法中增加查询
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String dateStr = sdf.format(checkDate);
-        String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift);
+        // String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift);
+        String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift, ShiroUtils.getSysUser().getDeptId());
         System.out.println("lastUpdateBy is " + lastUpdateBy);
         System.out.println("dateStr is " + dateStr + ", shift is " + shift);
         // 放入返回结果

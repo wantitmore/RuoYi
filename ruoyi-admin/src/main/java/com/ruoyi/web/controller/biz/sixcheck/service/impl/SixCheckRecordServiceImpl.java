@@ -93,9 +93,7 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService {
         return sixCheckRecordMapper.selectListByMonth(month, deptId);
     }
 
-    @Override
-    public String getLastUpdateBy(String checkDate, String shift) {
-        // TODO Auto-generated method stub
-        return sixCheckRecordMapper.getLastUpdateBy(checkDate, shift);
-    }
+    public String getLastUpdateBy(String checkDate, String shift, Long deptId) {
+    return sixCheckRecordMapper.getLastUpdateBy(checkDate, shift, deptId);
+}
 }
