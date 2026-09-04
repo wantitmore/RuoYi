@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.sixcheck.mapper.SixCheckReadLogMapper">
+        <!-- 查询某天的日梳理阅读记录 -->
+   <select id="selectReadLogsByDate" resultType="SixCheckReadLog">
+        SELECT
+            l.id,
+            l.dept_id AS deptId,
+            l.check_date AS checkDate,
+            l.user_id AS userId,
+            l.read_time AS readTime,
+            l.create_time AS createTime,   <!-- 表中只有这一个时间字段 -->
+            u.user_name AS readerName
+        FROM six_check_read_log l
+        LEFT JOIN sys_user u ON l.user_id = u.user_id
+        WHERE l.dept_id = #{deptId}
+        AND l.check_date = #{checkDate}
+        ORDER BY l.read_time DESC
+    </select>
+
+    <!-- 标记已读（插入或更新） -->
+    <insert id="upsertReadLog">
+        INSERT INTO six_check_read_log (dept_id, check_date, user_id, read_time, create_time)
+        VALUES (#{deptId}, #{checkDate}, #{userId}, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE read_time = NOW()
+    </insert>
+
+</mapper>

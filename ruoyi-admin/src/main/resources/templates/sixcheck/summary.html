@@ -67,6 +67,16 @@
                                         <i class="fa fa-search"></i> 查询
                                     </button>
                                 </div>
+                                <div class="col-sm-4" id="readStatusArea" style="display:none; margin-top:5px;">
+                                    <span style="font-weight:bold; color:#5cb85c;">
+                                        <i class="fa fa-book"></i> 已阅读领导：
+                                    </span>
+                                    <span id="readStatusContainer" style="font-weight:normal;">--</span>
+                                    <button class="btn btn-xs btn-success" onclick="markAsRead()"
+                                        style="margin-left:10px;">
+                                        <i class="fa fa-check"></i> 标记我已读
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <table id="summaryTable" class="table table-bordered table-hover" style="display:none;">
@@ -93,7 +103,7 @@
             var day = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
             $("#month").val(month);
             $("#day").val(day);
-            $("#viewMode").val('month');
+            $("#viewMode").val('day');
             toggleView();
             search();
         });
@@ -103,15 +113,16 @@
             if (mode === 'month') {
                 $("#monthInput").show();
                 $("#dayInput").hide();
+                $("#readStatusArea").hide();
                 $("#tableHead").html('<tr><th style="width: 40%;">检查项目</th><th>异常记录</th></tr>');
             } else {
                 $("#monthInput").hide();
                 $("#dayInput").show();
+                $("#readStatusArea").show();
                 $("#tableHead").html('<tr><th style="width: 40%;">类别</th><th>详细记录</th></tr>');
             }
             search();
         }
-
         function search() {
             var mode = $("#viewMode").val();
             if (mode === 'month') {
@@ -184,7 +195,60 @@
                 }
                 $("#summaryBody").html(html);
                 $("#summaryTable").show();
+                loadReadStatus(day);
             });
+        }
+        // ========== 阅读记录相关函数 ==========
+
+        /**
+         * 加载某天的日梳理阅读状态
+         */
+        function loadReadStatus(checkDate) {
+            $.get(ctx + "sixcheck/record/read/status", { checkDate: checkDate }, function (res) {
+                if (res.code === 0) {
+                    var logs = res.data || [];
+                    var container = $("#readStatusContainer");
+                    if (logs.length === 0) {
+                        container.html('<span style="color:#999;">暂无领导阅读</span>');
+                    } else {
+                        var html = '';
+                        logs.forEach(function (log, index) {
+                            if (index > 0) html += '、';
+                            html += '<span style="color:#337ab7;">' + log.readerName + '</span>';
+                            html += ' <span style="color:#999;font-size:12px;">(' + formatTime(log.readTime) + ')</span>';
+                        });
+                        container.html(html);
+                    }
+                }
+            });
+        }
+
+        /**
+         * 标记当前用户已阅读
+         */
+        function markAsRead() {
+            var day = $("#day").val();
+            if (!day) { alert("请选择日期"); return; }
+
+            $.post(ctx + "sixcheck/record/read/mark", { checkDate: day }, function (res) {
+                if (res.code === 0) {
+                    alert("标记已读成功");
+                    loadReadStatus(day);
+                } else {
+                    alert("标记失败：" + res.msg);
+                }
+            });
+        }
+
+        /**
+         * 格式化时间
+         */
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            var d = new Date(timeStr);
+            var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
         }
     </script>
 </body>

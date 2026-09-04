@@ -75,6 +75,7 @@
         LEFT JOIN sys_user u2 ON r.update_by = u2.login_name
         WHERE r.check_date = #{checkDate}
         AND r.shift = #{shift}
+        AND r.dept_id = #{deptId}
         ORDER BY r.update_time DESC
         LIMIT 1
     </select>

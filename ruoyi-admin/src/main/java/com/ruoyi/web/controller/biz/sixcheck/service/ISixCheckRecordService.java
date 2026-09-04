@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.Param;
 
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckReadLog;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 
 /**
@@ -65,4 +66,11 @@ public interface ISixCheckRecordService
     public List<SixCheckRecord> selectListByMonth(@Param("month") String month, @Param("deptId") Long deptId);
 
     public String getLastUpdateBy(String checkDate, String shift, Long deptId);
+
+     List<SixCheckReadLog> getReadLogsByDate(Long deptId, String checkDate);
+
+    /**
+     * 标记当前用户已阅读某天的日梳理
+     */
+    void markAsRead(Long deptId, String checkDate, Long userId);
 }

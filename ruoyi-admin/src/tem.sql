@@ -656,4 +656,14 @@ INSERT INTO sys_menu (
     '填表', @week_menu_id, 6, 'C', '0', 'week/list', 'week:view', '#', 'admin', NOW()
 );
 
+CREATE TABLE six_check_read_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    dept_id BIGINT NOT NULL COMMENT '部门ID（监区）',
+    check_date DATE NOT NULL COMMENT '值班日期',
+    user_id BIGINT NOT NULL COMMENT '阅读人ID（领导）',
+    read_time DATETIME NOT NULL COMMENT '阅读时间',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '首次创建时间',
+    UNIQUE KEY uk_dept_date_user (dept_id, check_date, user_id)
+) COMMENT='六必查日梳理阅读记录表';
+
 

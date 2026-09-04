@@ -4,7 +4,11 @@ import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.ruoyi.web.controller.biz.sixcheck.mapper.SixCheckReadLogMapper;
 import com.ruoyi.web.controller.biz.sixcheck.mapper.SixCheckRecordMapper;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckReadLog;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckRecordService;
 import com.ruoyi.common.core.text.Convert;
@@ -19,6 +23,9 @@ import com.ruoyi.common.core.text.Convert;
 public class SixCheckRecordServiceImpl implements ISixCheckRecordService {
     @Autowired
     private SixCheckRecordMapper sixCheckRecordMapper;
+
+    @Autowired
+    private SixCheckReadLogMapper readLogMapper;
 
     /**
      * 查询六必查记录
@@ -94,6 +101,17 @@ public class SixCheckRecordServiceImpl implements ISixCheckRecordService {
     }
 
     public String getLastUpdateBy(String checkDate, String shift, Long deptId) {
-    return sixCheckRecordMapper.getLastUpdateBy(checkDate, shift, deptId);
-}
+        return sixCheckRecordMapper.getLastUpdateBy(checkDate, shift, deptId);
+    }
+
+    @Override
+    public List<SixCheckReadLog> getReadLogsByDate(Long deptId, String checkDate) {
+        return readLogMapper.selectReadLogsByDate(deptId, checkDate);
+    }
+
+    @Override
+    @Transactional
+    public void markAsRead(Long deptId, String checkDate, Long userId) {
+        readLogMapper.upsertReadLog(deptId, checkDate, userId);
+    }
 }

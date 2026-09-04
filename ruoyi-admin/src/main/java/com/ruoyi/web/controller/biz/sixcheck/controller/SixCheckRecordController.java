@@ -35,6 +35,7 @@ import com.ruoyi.web.controller.biz.kpi.service.IKpiItemService;
 import com.ruoyi.web.controller.biz.kpi.service.IKpiScoreService;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckDeductDetail;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckItem;
+import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckReadLog;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecord;
 import com.ruoyi.web.controller.biz.sixcheck.domain.SixCheckRecordWrapper;
 import com.ruoyi.web.controller.biz.sixcheck.service.ISixCheckDeductDetailService;
@@ -252,7 +253,8 @@ public class SixCheckRecordController extends BaseController {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String dateStr = sdf.format(checkDate);
         // String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift);
-        String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift, ShiroUtils.getSysUser().getDeptId());
+        String lastUpdateBy = sixCheckRecordService.getLastUpdateBy(dateStr, shift,
+                ShiroUtils.getSysUser().getDeptId());
         System.out.println("lastUpdateBy is " + lastUpdateBy);
         System.out.println("dateStr is " + dateStr + ", shift is " + shift);
         // 放入返回结果
@@ -385,34 +387,6 @@ public class SixCheckRecordController extends BaseController {
         return success("保存成功");
     }
     // ========== 辅助方法 ==========
-
-    /**
-     * 从扣分描述中提取用户名
-     */
-    private String extractUserName(String deductInfo) {
-        Pattern p = Pattern.compile("（关联加扣分-(.+?)-");
-        Matcher m = p.matcher(deductInfo);
-        if (m.find()) {
-            return m.group(1).trim();
-        }
-        return null;
-    }
-
-    /**
-     * 从扣分描述中提取分数
-     */
-    private BigDecimal extractScore(String deductInfo) {
-        System.out.println("=== extractScore 输入: " + deductInfo);
-        Pattern p = Pattern.compile("(-?\\d+\\.?\\d*)分");
-        Matcher m = p.matcher(deductInfo);
-        if (m.find()) {
-            BigDecimal result = new BigDecimal(m.group(1));
-            System.out.println("=== extractScore 输出: " + result);
-            return result;
-        }
-        System.out.println("=== extractScore 输出: 0（解析失败）");
-        return BigDecimal.ZERO;
-    }
 
     @RequiresPermissions("sixcheck:summary")
     @GetMapping("/summary")
@@ -583,28 +557,36 @@ public class SixCheckRecordController extends BaseController {
         return success().put("data", result);
     }
 
+    @GetMapping("/read/status")
+    @ResponseBody
+    public AjaxResult getReadStatus(@RequestParam String checkDate) {
+        Long deptId = ShiroUtils.getSysUser().getDeptId();
+        List<SixCheckReadLog> logs = sixCheckRecordService.getReadLogsByDate(deptId, checkDate);
+        return AjaxResult.success(logs);
+    }
+
+    @PostMapping("/read/mark")
+    @ResponseBody
+    public AjaxResult markAsRead(@RequestParam String checkDate) {
+        SysUser currentUser = ShiroUtils.getSysUser();
+        boolean isAuthorized = currentUser.isAdmin() ||
+                currentUser.getRoles().stream().anyMatch(role -> "dept_leader".equals(role.getRoleKey()));
+
+        if (!isAuthorized) {
+            return AjaxResult.error("仅限监区领导标记已读");
+        }
+
+        Long userId = ShiroUtils.getUserId();
+        Long deptId = ShiroUtils.getSysUser().getDeptId();
+        sixCheckRecordService.markAsRead(deptId, checkDate, userId);
+        return AjaxResult.success("标记已读成功");
+    }
+
     // ============================================================
     // 辅助方法
     // ============================================================
 
     // ========== 辅助方法 ==========
-
-    /**
-     * 从 recordValue 中提取扣分描述
-     * 格式：（关联加扣分-用户名-分数-备注）
-     * 或：（关联加扣分-用户名-备注）
-     */
-    private String extractDeductInfo(String recordValue) {
-        if (recordValue == null)
-            return null;
-        // 匹配 （关联加扣分-...） 格式
-        Pattern p = Pattern.compile("（关联加扣分-[^）]*）");
-        Matcher m = p.matcher(recordValue);
-        if (m.find()) {
-            return m.group();
-        }
-        return null;
-    }
 
     private String removeDeductInfoByLine(String content, String deductInfo) {
         if (StringUtils.isBlank(content))
