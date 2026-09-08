@@ -51,7 +51,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             u.user_name AS userName,
             d.dept_name AS deptName,
             p.post_name AS postName,
-            COALESCE(ROUND(100 + SUM(s.score) / NULLIF(COUNT(DISTINCT s.batch_no), 0), 2), 0) AS totalScore,
+            COALESCE(ROUND(100 + SUM(s.score) / NULLIF(COUNT(DISTINCT s.batch_no), 0), 2), 100) AS totalScore,
             COUNT(DISTINCT s.batch_no) AS itemCount
         FROM sys_user u
         LEFT JOIN sys_dept d ON u.dept_id = d.dept_id

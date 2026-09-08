@@ -499,7 +499,7 @@ public class KpiScoreController extends BaseController {
         for (int i = 0; i < list.size(); i++) {
             list.get(i).setRank(i + 1);
             // totalScore 存储的是平均分，保留两位小数
-            list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
+                        list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
         }
         return success().put("data", list);
     }

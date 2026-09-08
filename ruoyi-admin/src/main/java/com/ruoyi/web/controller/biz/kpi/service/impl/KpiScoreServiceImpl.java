@@ -109,10 +109,15 @@ public class KpiScoreServiceImpl implements IKpiScoreService {
 
     @Override
     public List<ScoreSummary> selectAvgSummary(List<String> months, Long deptId, Long postId) {
-        if (months != null && !months.isEmpty()) {
-            return kpiScoreMapper.selectAvgSummary(months, deptId, postId);
+        List<ScoreSummary> list = kpiScoreMapper.selectAvgSummary(months, deptId, postId);
+
+        int monthCount = months != null ? months.size() : 0;
+        for (ScoreSummary summary : list) {
+            if (summary.getItemCount() == 0) {
+                summary.setItemCount(monthCount); // 参与月数改为区间总月数
+            }
         }
-        return null;
+        return list;
     }
 
     @Override
