@@ -50,7 +50,7 @@
                                 <label class="col-sm-1 control-label">部门：</label>
                                 <div class="col-sm-2">
                                     <select id="deptSelect" class="form-control">
-                                        <option value="">全部部门</option>
+                                        <!-- <option value="">全部部门</option> -->
                                         <option th:each="dept : ${depts}" th:value="${dept.deptId}"
                                             th:text="${dept.deptName}"></option>
                                     </select>
@@ -91,6 +91,9 @@
         var currentFactors = [];
         var canEdit = [[${ canEdit }]];
         var currentType = 'common';
+        var currentDeptId = [[${ currentDeptId }]];
+        var currentDeptName = [[${ currentDeptName }]];
+        var selectedDeptId = currentDeptId;
         var typeLabelMap = {
             'quarter': '分区领导考核',
             'common': '普通员工考核'
@@ -115,6 +118,16 @@
             var month = now.getMonth() + 1;
             var currentQ = Math.ceil(month / 3);
             var options = '';
+            var deptSelect = $("#deptSelect");
+            var firstOption = deptSelect.find("option:first");
+            if (firstOption.length > 0) {
+                deptSelect.val(firstOption.val());
+                selectedDeptId = firstOption.val();
+            }
+            $("#deptSelect").on('change', function () {
+                selectedDeptId = $(this).val();
+                loadData();
+            });
             for (var y = year - 1; y <= year + 1; y++) {
                 for (var q = 1; q <= 4; q++) {
                     var val = y + '-Q' + q;
@@ -128,7 +141,8 @@
 
         function loadData() {
             var batchNo = $("#batchNo").val();
-            var deptId = $("#deptSelect").val();
+            // var deptId = $("#deptSelect").val();
+            var deptId = selectedDeptId;
             if (!batchNo) { alert("请选择季度"); return; }
             var type = currentType;
             $.get(ctx + "quarter/data", { batchNo: batchNo, deptId: deptId, type: type }, function (res) {
@@ -247,7 +261,9 @@
                             data: JSON.stringify({
                                 batchNo: batchNo,
                                 factorId: factorId,
-                                grades: grades
+                                grades: grades,
+                                deptId: selectedDeptId, 
+                                type: currentType
                             })
                         })
                     );
@@ -263,7 +279,8 @@
         }
         function showStats() {
             var batchNo = $("#batchNo").val();
-            var deptId = $("#deptSelect").val();
+            // var deptId = $("#deptSelect").val();
+            var deptId = selectedDeptId;
             var type = currentType || 'common';
             if (!batchNo) {
                 alert("请选择季度");

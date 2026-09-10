@@ -110,9 +110,6 @@ public class QuarterController extends BaseController {
     public AjaxResult data(@RequestParam String batchNo,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false, defaultValue = "quarter") String type) {
-        if (!ShiroUtils.getSysUser().isAdmin()) {
-            deptId = ShiroUtils.getSysUser().getDeptId();
-        }
 
         SysUser currentUser = ShiroUtils.getSysUser();
 
@@ -362,9 +359,6 @@ public class QuarterController extends BaseController {
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false, defaultValue = "quarter") String type) {
         // 权限处理
-        if (!ShiroUtils.getSysUser().isAdmin()) {
-            deptId = ShiroUtils.getSysUser().getDeptId();
-        }
         System.out.println("=== stats: batchNo=" + batchNo + ", deptId=" + deptId + ", type=" + type);
         // 1. 获取该批次该部门所有评分记录
         QuarterScore query = new QuarterScore();

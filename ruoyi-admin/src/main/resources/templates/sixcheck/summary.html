@@ -62,6 +62,14 @@
                                 <div class="col-sm-2" id="dayInput" style="display:none;">
                                     <input type="date" id="day" class="form-control" />
                                 </div>
+                                <label class="col-sm-1 control-label" style="width:70px;">部1门：</label>
+                                <div class="col-sm-2" id="deptInput">
+                                    <select id="deptSelect" class="form-control">
+                                        <!-- 注意：无“全部部门”选项 -->
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
                                 <div class="col-sm-2">
                                     <button class="btn btn-primary" onclick="search()">
                                         <i class="fa fa-search"></i> 查询
@@ -95,6 +103,9 @@
     </div>
     <div th:include="include :: footer"></div>
     <script th:inline="javascript">
+        var isAdmin = [[${ isAdmin }]];           // 从后端获取
+        var currentDeptId = [[${ currentDeptId }]];
+        var currentDeptName = [[${ currentDeptName }]];
         var ctx = [[@{/}]];
 
         $(function () {
@@ -104,6 +115,13 @@
             $("#month").val(month);
             $("#day").val(day);
             $("#viewMode").val('day');
+            var deptSelect = $("#deptSelect");
+            var deptSelect = $("#deptSelect");
+            // 默认选中第一个部门（所有用户均如此）
+            var firstOption = deptSelect.find("option:first");
+            if (firstOption.length > 0) {
+                deptSelect.val(firstOption.val());
+            }
             toggleView();
             search();
         });
@@ -125,17 +143,24 @@
         }
         function search() {
             var mode = $("#viewMode").val();
+            var deptId;
+            var deptId = $("#deptSelect").val();
+            console.error("当前选中的部门ID:", deptId); 
             if (mode === 'month') {
-                loadMonthSummary();
+                loadMonthSummary(deptId);
             } else {
-                loadDaySummary();
+                loadDaySummary(deptId);
             }
         }
 
-        function loadMonthSummary() {
+        function loadMonthSummary(deptId) {
             var month = $("#month").val();
             if (!month) { alert("请选择月份"); return; }
-            $.get(ctx + "sixcheck/record/summary/data", { month: month }, function (res) {
+            var url = ctx + "sixcheck/record/summary/data?month=" + encodeURIComponent(month);
+            if (deptId) {
+                url += "&deptId=" + encodeURIComponent(deptId);
+            }
+            $.get(url, function (res) {
                 if (res.code != 0) { alert("查询失败"); return; }
                 var data = res.data;
                 var html = '';
@@ -162,10 +187,14 @@
             });
         }
 
-        function loadDaySummary() {
+        function loadDaySummary(deptId) {
             var day = $("#day").val();
             if (!day) { alert("请选择日期"); return; }
-            $.get(ctx + "sixcheck/record/dailySummary", { checkDate: day }, function (res) {
+            var url = ctx + "sixcheck/record/dailySummary?checkDate=" + encodeURIComponent(day);
+            if (deptId) {
+                url += "&deptId=" + encodeURIComponent(deptId);
+            }
+            $.get(url, function (res) {
                 if (res.code != 0) { alert("查询失败"); return; }
                 var data = res.data;
                 var html = '';
@@ -195,7 +224,7 @@
                 }
                 $("#summaryBody").html(html);
                 $("#summaryTable").show();
-                loadReadStatus(day);
+                loadReadStatus(day, deptId);
             });
         }
         // ========== 阅读记录相关函数 ==========
@@ -203,8 +232,10 @@
         /**
          * 加载某天的日梳理阅读状态
          */
-        function loadReadStatus(checkDate) {
-            $.get(ctx + "sixcheck/record/read/status", { checkDate: checkDate }, function (res) {
+        function loadReadStatus(checkDate, deptId) {
+            var url = ctx + "sixcheck/record/read/status?checkDate=" + encodeURIComponent(checkDate);
+            if (deptId) url += "&deptId=" + deptId;
+            $.get(url, function (res) {
                 if (res.code === 0) {
                     var logs = res.data || [];
                     var container = $("#readStatusContainer");
@@ -229,11 +260,12 @@
         function markAsRead() {
             var day = $("#day").val();
             if (!day) { alert("请选择日期"); return; }
+            var deptId = !isAdmin ? currentDeptId : $("#deptSelect").val();
 
-            $.post(ctx + "sixcheck/record/read/mark", { checkDate: day }, function (res) {
+            $.post(ctx + "sixcheck/record/read/mark", { checkDate: day, deptId: deptId }, function (res) {
                 if (res.code === 0) {
                     alert("标记已读成功");
-                    loadReadStatus(day);
+                    loadReadStatus(day, deptId);
                 } else {
                     alert("标记失败：" + res.msg);
                 }

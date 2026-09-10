@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
@@ -40,6 +42,7 @@ import com.ruoyi.web.controller.biz.video.domain.VideoCheckItem;
 import com.ruoyi.web.controller.biz.video.domain.VideoPlaybackRecord;
 import com.ruoyi.web.controller.biz.video.service.IVideoCheckItemService;
 import com.ruoyi.web.controller.biz.video.service.IVideoPlaybackRecordService;
+import com.ruoyi.system.service.ISysDeptService;
 import com.ruoyi.system.service.ISysUserService;
 
 @Controller
@@ -63,6 +66,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
     @Autowired
     private ISysUserService userService;
+
+    @Autowired
+    private ISysDeptService deptService;
 
     private String prefix = "video/record";
 
@@ -90,21 +96,23 @@ public class VideoPlaybackRecordController extends BaseController {
     public String input(ModelMap mmap) {
         mmap.put("canEdit", ShiroUtils.getSubject().isPermitted("video:record:edit"));
         mmap.put("currentDeptId", ShiroUtils.getSysUser().getDeptId());
+        List<SysDept> depts = deptService.selectDeptList(new SysDept());
+        mmap.put("depts", depts);
         return "video/input";
     }
 
     @GetMapping("/load")
     @ResponseBody
-    public AjaxResult load(@RequestParam String batchNo) {
+    public AjaxResult load(@RequestParam String batchNo, @RequestParam(required = false) Long deptId) {
         System.out.println("load batchNo : " + batchNo);
         VideoCheckItem queryItem = new VideoCheckItem();
-        queryItem.setDeptId(ShiroUtils.getSysUser().getDeptId());
+        queryItem.setDeptId(deptId);
         List<VideoCheckItem> items = videoCheckItemService.selectVideoCheckItemList(queryItem);
         items.sort(Comparator.comparing(VideoCheckItem::getSortOrder));
 
         VideoPlaybackRecord queryRecord = new VideoPlaybackRecord();
         queryRecord.setBatchNo(batchNo);
-        queryRecord.setDeptId(ShiroUtils.getSysUser().getDeptId());
+        queryRecord.setDeptId(/* ShiroUtils.getSysUser().getDeptId() */deptId);
         List<VideoPlaybackRecord> records = videoPlaybackRecordService.selectVideoPlaybackRecordList(queryRecord);
 
         Map<Long, String> recordMap = new HashMap<>();
@@ -157,8 +165,12 @@ public class VideoPlaybackRecordController extends BaseController {
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(@RequestBody List<VideoPlaybackRecord> recordList) {
+        Long deptId = null;
+        if (!recordList.isEmpty()) {
+            deptId = recordList.get(0).getDeptId();
+        }
         for (VideoPlaybackRecord r : recordList) {
-            r.setDeptId(ShiroUtils.getSysUser().getDeptId());
+            r.setDeptId(deptId);
             VideoPlaybackRecord exist = new VideoPlaybackRecord();
             exist.setItemId(r.getItemId());
             exist.setBatchNo(r.getBatchNo());

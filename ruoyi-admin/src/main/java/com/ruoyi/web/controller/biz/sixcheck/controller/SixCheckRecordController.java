@@ -47,10 +47,12 @@ import io.micrometer.common.util.StringUtils;
 
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.service.ISysDeptService;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.ShiroUtils;
@@ -79,6 +81,9 @@ public class SixCheckRecordController extends BaseController {
     private IKpiItemService kpiItemService; // 注入考核项目Service
     @Autowired
     private ISysUserService userService;
+
+    @Autowired
+    private ISysDeptService deptService;
 
     @Autowired
     private ISixCheckDeductDetailService sixCheckDeductDetailService;
@@ -390,7 +395,14 @@ public class SixCheckRecordController extends BaseController {
 
     @RequiresPermissions("sixcheck:summary")
     @GetMapping("/summary")
-    public String summary() {
+    public String summary(ModelMap mmap) {
+        SysUser user = ShiroUtils.getSysUser();
+        mmap.put("isAdmin", user.isAdmin());
+        mmap.put("currentDeptId", user.getDeptId());
+        mmap.put("currentDeptName", user.getDept().getDeptName());
+        // 部门列表（若依数据权限自动过滤）
+        List<SysDept> depts = deptService.selectDeptList(new SysDept());
+        mmap.put("depts", depts);
         return "sixcheck/summary";
     }
 
@@ -400,7 +412,7 @@ public class SixCheckRecordController extends BaseController {
     public AjaxResult dailySummary(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date checkDate,
             @RequestParam(required = false) Long deptId) {
         if (!ShiroUtils.getSysUser().isAdmin()) {
-            deptId = ShiroUtils.getSysUser().getDeptId();
+            // deptId = ShiroUtils.getSysUser().getDeptId();
         }
 
         // 1. 查询该日期所有班次的记录（不过滤正常/异常）
@@ -559,25 +571,30 @@ public class SixCheckRecordController extends BaseController {
 
     @GetMapping("/read/status")
     @ResponseBody
-    public AjaxResult getReadStatus(@RequestParam String checkDate) {
-        Long deptId = ShiroUtils.getSysUser().getDeptId();
+    public AjaxResult getReadStatus(@RequestParam String checkDate, @RequestParam(required = false) Long deptId) {
+        SysUser user = ShiroUtils.getSysUser();
+        if (!user.isAdmin()) {
+            deptId = user.getDeptId(); // 非管理员强制本部门
+        }
         List<SixCheckReadLog> logs = sixCheckRecordService.getReadLogsByDate(deptId, checkDate);
         return AjaxResult.success(logs);
     }
 
     @PostMapping("/read/mark")
     @ResponseBody
-    public AjaxResult markAsRead(@RequestParam String checkDate) {
+    public AjaxResult markAsRead(@RequestParam String checkDate,
+            @RequestParam(required = false) Long deptId) {
         SysUser currentUser = ShiroUtils.getSysUser();
+        if (!currentUser.isAdmin()) {
+            deptId = currentUser.getDeptId(); // 非管理员强制本部门
+        }
+        // 权限判断（仍允许管理员和监区领导）
         boolean isAuthorized = currentUser.isAdmin() ||
                 currentUser.getRoles().stream().anyMatch(role -> "dept_leader".equals(role.getRoleKey()));
-
         if (!isAuthorized) {
             return AjaxResult.error("仅限监区领导标记已读");
         }
-
         Long userId = ShiroUtils.getUserId();
-        Long deptId = ShiroUtils.getSysUser().getDeptId();
         sixCheckRecordService.markAsRead(deptId, checkDate, userId);
         return AjaxResult.success("标记已读成功");
     }

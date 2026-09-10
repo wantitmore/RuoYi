@@ -485,9 +485,6 @@ public class KpiScoreController extends BaseController {
             @RequestParam String endMonth,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Long postId) {
-        if (!ShiroUtils.getSysUser().isAdmin()) {
-            deptId = ShiroUtils.getSysUser().getDeptId();
-        }
 
         // 生成区间月份列表
         List<String> months = getMonthsBetween(startMonth, endMonth);
@@ -495,11 +492,13 @@ public class KpiScoreController extends BaseController {
             return error("开始月份不能大于结束月份");
         }
 
+        // 调用服务层，传入 deptId（可能为 null）
         List<ScoreSummary> list = kpiScoreService.selectAvgSummary(months, deptId, postId);
+
+        // 处理排名和精度
         for (int i = 0; i < list.size(); i++) {
             list.get(i).setRank(i + 1);
-            // totalScore 存储的是平均分，保留两位小数
-                        list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
+            list.get(i).setTotalScore(Math.round(list.get(i).getTotalScore() * 100.0) / 100.0);
         }
         return success().put("data", list);
     }

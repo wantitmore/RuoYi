@@ -26,7 +26,7 @@
                                 <label class="col-sm-1 control-label">部门：</label>
                                 <div class="col-sm-2">
                                     <select id="deptSelect" class="form-control">
-                                        <option value="">全部部门</option>
+                                        <!-- <option value="">全部部门</option> -->
                                         <option th:each="dept : ${depts}" th:value="${dept.deptId}"
                                             th:text="${dept.deptName}"></option>
                                     </select>
@@ -84,11 +84,11 @@
                 var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
                 $("#startMonth").val(month);
                 $("#endMonth").val(month);
-                if (!isAdmin && currentDeptName && currentDeptName !== '') {
+                /* if (!isAdmin && currentDeptName && currentDeptName !== '') {
                     $("#deptSelect").hide();
                     $("#deptSelect").prev("label").hide();
                     $("#deptSelect").after('<span class="form-control-static" style="margin-left:10px;font-weight:bold;padding-top:7px;display:inline-block;">' + currentDeptName + '</span>');
-                }
+                } */
                 // 页面打开时自动加载
                 search();
                 // 仅岗位下拉框改变时自动刷新
@@ -156,10 +156,6 @@
             function search() {
                 var startMonth = document.getElementById("startMonth").value;
                 var endMonth = document.getElementById("endMonth").value;
-                var el = document.getElementById("startMonth");
-                console.log(el);                    // 查看元素本身
-                console.log(typeof el.value);       // 打印 value 的类型
-                console.log(el.value);              // 打印 value 的值
                 var deptIdEl;
                 var postId;
                 if (!isAdmin) {
@@ -169,9 +165,11 @@
                     // 管理员：从下拉框获取
                     deptIdEl = document.getElementById("deptSelect").value;
                 }
+                // var deptId = deptIdEl.value;
+                var deptId = document.getElementById("deptSelect").value;
                 postId = document.getElementById("postSelect").value;
 
-                var deptId = deptIdEl.value;
+
 
                 if (!startMonth || !endMonth) {
                     alert("请选择开始和结束月份");

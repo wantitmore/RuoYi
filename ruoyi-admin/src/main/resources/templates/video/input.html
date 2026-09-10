@@ -31,6 +31,13 @@
                                 <div class="col-sm-2">
                                     <input type="month" id="batchNo" class="form-control" />
                                 </div>
+                                <label class="col-sm-1 control-label">部门：</label>
+                                <div class="col-sm-2">
+                                    <select id="deptSelect" class="form-control">
+                                        <option th:each="dept : ${depts}" th:value="${dept.deptId}"
+                                            th:text="${dept.deptName}"></option>
+                                    </select>
+                                </div>
                                 <div class="col-sm-2">
                                     <button class="btn btn-primary" onclick="loadData()">
                                         <i class="fa fa-search"></i> 加载/刷新
@@ -69,12 +76,25 @@
         var deptItems = [];
         var canDeduct = [[${ canEdit }]];
 
+        var currentDeptId = [[${ currentDeptId }]];
+        var selectedDeptId = currentDeptId;
+
         $(function () {
             var now = new Date();
             var month = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
             $("#batchNo").val(month);
+            var deptSelect = $("#deptSelect");
+            var firstOption = deptSelect.find("option:first");
+            if (firstOption.length > 0) {
+                deptSelect.val(firstOption.val());
+                selectedDeptId = firstOption.val();
+            }
             loadData();
             $("#batchNo").on('change', function () {
+                loadData();
+            });
+            $("#deptSelect").on('change', function () {
+                selectedDeptId = $(this).val();
                 loadData();
             });
         });
@@ -82,7 +102,8 @@
         function loadData() {
             var batchNo = $("#batchNo").val();
             if (!batchNo) { alert("请选择月份"); return; }
-            $.get(ctx + "video/record/load", { batchNo: batchNo }, function (res) {
+            var deptId = selectedDeptId;
+            $.get(ctx + "video/record/load", { batchNo: batchNo, deptId: deptId }, function (res) {
                 if (res.code != 0) { alert("加载失败"); return; }
                 var items = res.data.items;
                 var records = res.data.records;
@@ -158,6 +179,7 @@
         function saveData(silent) {
             var batchNo = $("#batchNo").val();
             if (!batchNo) { alert("请选择月份"); return; }
+            var deptId = selectedDeptId;
 
             var recordList = [];
             $("#tableBody textarea").each(function () {
@@ -167,7 +189,8 @@
                     recordList.push({
                         itemId: itemId,
                         batchNo: batchNo,
-                        playbackStatus: value
+                        playbackStatus: value,
+                        deptId: deptId
                     });
                 }
             });
@@ -222,7 +245,8 @@
         }
 
         function openDeductModal(checkItemName, videoItemId) {
-            var deptId = [[${ currentDeptId }]];
+            // var deptId = [[${ currentDeptId }]];
+            var deptId = selectedDeptId;
             if (!deptId) {
                 alert("无法获取部门信息");
                 return;
@@ -240,7 +264,7 @@
             ).done(function (usersRes, itemsRes) {
                 var users = usersRes[0].data || [];
                 var items = itemsRes[0].data || [];
-                window._deductItems = items; 
+                window._deductItems = items;
                 var userOptions = '<option value="">请选择</option>';
                 $.each(users, function (i, u) {
                     userOptions += '<option value="' + u.userId + '">' + u.userName + '</option>';
