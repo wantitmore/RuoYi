@@ -872,6 +872,15 @@ public class KpiScoreController extends BaseController {
             virtual.setId(-kpiScoreId); // 或任意负值
             detailList = Collections.singletonList(virtual);
         }
+        for (SixCheckDeductDetail d : detailList) {
+            String loginName = d.getCreateBy();
+            if (StringUtils.isNotBlank(loginName)) {
+                SysUser u = userService.selectUserByLoginName(loginName);
+                if (u != null && StringUtils.isNotBlank(u.getUserName())) {
+                    d.setCreateBy(u.getUserName()); // 直接覆盖为姓名
+                }
+            }
+        }
 
         return success(detailList);
     }
