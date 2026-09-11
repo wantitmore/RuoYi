@@ -299,7 +299,7 @@ public class SixCheckRecordController extends BaseController {
 
         Subject subject = SecurityUtils.getSubject();
 
-        boolean isSelf = currentUser.equals(detail.getCreateBy());
+        boolean isSelf = currentUser.getLoginName().equals(detail.getCreateBy());
         boolean isAdmin = subject.hasRole("admin");
         boolean isDeptAdmin = subject.hasRole("dept_manager");
 

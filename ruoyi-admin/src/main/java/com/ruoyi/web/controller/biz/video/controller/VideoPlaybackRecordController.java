@@ -218,10 +218,9 @@ public class VideoPlaybackRecordController extends BaseController {
 
         Subject subject = SecurityUtils.getSubject();
 
-        boolean isSelf = currentUser.equals(detail.getCreateBy());
+        boolean isSelf = currentUser.getLoginName().equals(detail.getCreateBy());
         boolean isAdmin = subject.hasRole("admin");
         boolean isDeptAdmin = subject.hasRole("dept_manager");
-
         if (!isSelf && !isAdmin && !isDeptAdmin) {
             return AjaxResult.error("权限不足：只有本人、部门管理员可以撤销");
         }

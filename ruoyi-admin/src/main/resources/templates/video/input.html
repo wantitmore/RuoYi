@@ -303,7 +303,7 @@
                         var itemId = $(layero).find('#deductItemId').val();
                         var score = $(layero).find('#deductScore').val();
                         var remark = $(layero).find('#deductRemark').val();
-                        if (!userId || !itemId || !score) {
+                        if (!userId || !itemId || !score || !remark) {
                             alert("请填写完整信息");
                             return;
                         }

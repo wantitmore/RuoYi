@@ -332,7 +332,7 @@
                         var itemId = $(layero).find('#deductItemId').val();
                         var score = parseFloat($(layero).find('#deductScore').val());
                         var remark = $(layero).find('#deductRemark').val();
-                        if (!userId || !itemId || isNaN(score)) {
+                        if (!userId || !itemId || isNaN(score) || !remark) {
                             alert("请填写完整信息");
                             return;
                         }

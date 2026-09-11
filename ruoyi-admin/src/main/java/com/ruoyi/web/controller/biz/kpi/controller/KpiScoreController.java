@@ -528,8 +528,11 @@ public class KpiScoreController extends BaseController {
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult quickDeduct(@RequestBody QuickDeductDTO dto) {
         // ---------- 1. 基础参数校验 ----------
-        if (dto.getUserId() == null || dto.getItemId() == null || dto.getScore() == null) {
-            return error("缺少必填参数：userId, itemId, score");
+        if (dto.getUserId() == null || dto.getItemId() == null || dto.getScore() == null || dto.getRemark() == null) {
+            return error("缺少必填参数：userId, itemId, score，remark");
+        }
+        if (StringUtils.isBlank(dto.getRemark())) {
+            return error("备注不能为空");
         }
         if (StringUtils.isBlank(dto.getCheckDate()) || dto.getCheckDate().length() < 7) {
             return error("检查日期不能为空且格式必须为 yyyy-MM");
@@ -624,8 +627,11 @@ public class KpiScoreController extends BaseController {
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult videoQuickDeduct(@RequestBody QuickDeductDTO dto) {
         // ---------- 1. 基础参数校验 ----------
-        if (dto.getUserId() == null || dto.getItemId() == null || dto.getScore() == null) {
-            return error("缺少必填参数：userId, itemId, score");
+        if (dto.getUserId() == null || dto.getItemId() == null || dto.getScore() == null || dto.getRemark() == null) {
+            return error("缺少必填参数：userId, itemId, score, remark");
+        }
+        if (StringUtils.isBlank(dto.getRemark())) {
+            return error("备注不能为空");
         }
         if (StringUtils.isBlank(dto.getCheckDate()) || dto.getCheckDate().length() < 7) {
             return error("检查日期不能为空且格式必须为 yyyy-MM");
