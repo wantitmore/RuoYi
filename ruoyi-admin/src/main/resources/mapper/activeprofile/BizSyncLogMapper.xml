@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.web.controller.biz.activeprofile.mapper.BizSyncLogMapper">
+
+    <resultMap id="BizSyncLogResult" type="com.ruoyi.web.controller.biz.activeprofile.domain.BizSyncLog">
+        <id     property="id"            column="id"/>
+        <result property="interfaceName" column="interface_name"/>
+        <result property="lastSyncTime"  column="last_sync_time"/>
+        <result property="status"        column="status"/>
+        <result property="message"       column="message"/>
+        <result property="updateTime"    column="update_time"/>
+    </resultMap>
+
+    <select id="selectByInterfaceName" parameterType="String" resultMap="BizSyncLogResult">
+        SELECT * FROM biz_sync_log WHERE interface_name = #{interfaceName}
+    </select>
+
+    <select id="selectAll" resultMap="BizSyncLogResult">
+        SELECT * FROM biz_sync_log ORDER BY id
+    </select>
+
+    <update id="updateSyncLog" parameterType="com.ruoyi.web.controller.biz.activeprofile.domain.BizSyncLog">
+        UPDATE biz_sync_log
+        <set>
+            <if test="lastSyncTime != null">last_sync_time = #{lastSyncTime},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="message != null">message = #{message},</if>
+            update_time = NOW()
+        </set>
+        WHERE interface_name = #{interfaceName}
+    </update>
+
+</mapper>

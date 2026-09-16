@@ -666,4 +666,50 @@ CREATE TABLE six_check_read_log (
     UNIQUE KEY uk_dept_date_user (dept_id, check_date, user_id)
 ) COMMENT='六必查日梳理阅读记录表';
 
+--动态档案
+-- 罪犯档案主表
+DROP TABLE IF EXISTS biz_criminal;
+CREATE TABLE biz_criminal (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    bh              VARCHAR(50)  NOT NULL COMMENT '囚号（唯一键）',
+    xm              VARCHAR(100) NOT NULL COMMENT '姓名',
+    data_json       JSON         COMMENT '10个模块全部内容',
+    raw_json        JSON         COMMENT '接口原始数据（预留）',
+    owner_id        BIGINT       COMMENT '归属人，NULL=部门公共',
+    owner_name      VARCHAR(50)  COMMENT '归属人姓名',
+    dept_id         BIGINT       COMMENT '所属部门',
+    data_source     VARCHAR(20)  DEFAULT 'manual' COMMENT 'manual/api/mixed',
+    manual_fields   VARCHAR(500) COMMENT '用户手动改过的字段列表',
+    create_by       VARCHAR(64),
+    create_time     DATETIME,
+    update_by       VARCHAR(64),
+    update_time     DATETIME,
+    remark          VARCHAR(500),
+    del_flag        CHAR(1) DEFAULT '0',
+    UNIQUE KEY uk_bh (bh),
+    KEY idx_owner (owner_id),
+    KEY idx_dept_owner (dept_id, owner_id),
+    KEY idx_update_time (update_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='罪犯动态档案';
 
+-- 同步进度表(预留的接口)
+DROP TABLE IF EXISTS biz_sync_log;
+CREATE TABLE biz_sync_log (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    interface_name  VARCHAR(50)  NOT NULL COMMENT '接口名',
+    last_sync_time  DATETIME     COMMENT '最后同步时间',
+    status          VARCHAR(20)  DEFAULT 'pending' COMMENT 'success/failed/running',
+    message         VARCHAR(500) COMMENT '错误信息',
+    update_time     DATETIME,
+    UNIQUE KEY uk_interface (interface_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='接口同步进度表';
+
+INSERT INTO biz_sync_log (interface_name, status, update_time) 
+VALUES ('IMP_ZF_JBXX', 'pending', NOW()),
+       ('IMP_YQYB',   'pending', NOW());
+
+-- 菜单权限（按你项目实际调整）
+-- 需要在【系统管理→菜单管理】手动新建：
+-- 菜单名称：罪犯动态档案
+-- 路径：biz/activeprofile
+-- 权限标识：biz:activeprofile:view

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head th:include="include :: header('罪犯动态档案')"></head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>罪犯动态档案</h5>
+                    </div>
+                    <div class="ibox-content">
+                        <!-- 查询区 -->
+                        <form id="queryForm" class="form-horizontal">
+                            <div class="form-group">
+                                <label class="col-sm-1 control-label">姓名：</label>
+                                <div class="col-sm-2">
+                                    <input type="text" id="qXm" class="form-control">
+                                </div>
+                                <label class="col-sm-1 control-label">囚号：</label>
+                                <div class="col-sm-2">
+                                    <input type="text" id="qBh" class="form-control">
+                                </div>
+                                <div class="col-sm-4">
+                                    <button type="button" class="btn btn-primary" onclick="loadTable()">
+                                        <i class="fa fa-search"></i> 查询
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="addCriminal()">
+                                        <i class="fa fa-plus"></i> 新增
+                                    </button>
+                                    <button type="button" class="btn btn-warning" onclick="batchTransfer()">
+                                        <i class="fa fa-exchange"></i> 批量转移
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        <ul class="nav nav-tabs" id="listTab" style="margin-top:10px;">
+                            <li class="active">
+                                <a href="javascript:void(0)" onclick="switchTab('my', this)">
+                                    我的专管档案 <span class="badge" id="badgeMy">0</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" onclick="switchTab('public', this)">
+                                    本部门公共档案 <span class="badge" id="badgePublic">0</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0)" onclick="switchTab('all', this)">
+                                    本部门全部档案 <span class="badge" id="badgeAll">0</span>
+                                </a>
+                            </li>
+                        </ul>
+
+
+                        <table id="dataTable" class="table table-bordered table-hover"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var canTransferDept = [[${ canTransferDept }]];
+        var currentFilterType = 'my';
+        console.log('canTransferDept =', canTransferDept);
+        $(function () {
+            $('#dataTable').bootstrapTable({
+                url: ctx + 'biz/activeProfile/list',
+                method: 'post',
+                contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+                pagination: true,
+                sidePagination: 'server',
+                pageSize: 10,
+                pageList: [10, 20, 50],
+                queryParams: function (p) {
+                     console.log('【queryParams】filterType =', currentFilterType);
+                    return {
+                        pageNum: p.offset / p.limit + 1,
+                        pageSize: p.limit,
+                        filterType: currentFilterType,
+                        xm: $('#qXm').val(),
+                        bh: $('#qBh').val()
+                    };
+                },
+                columns: [
+                    { checkbox: true },
+                    { field: 'id', title: 'ID', width: 60 },
+                    { field: 'bh', title: '囚号' },
+                    { field: 'xm', title: '姓名' },
+                    { field: 'deptName', title: '部门' },
+                    {
+                        field: 'ownerName', title: '归属人',
+                        formatter: function (v) {
+                            return v ? v : '<span style="color:#999;">（公共）</span>';
+                        }
+                    },
+                    {
+                        field: 'dataSource', title: '来源', formatter: function (v) {
+                            var map = { 'manual': '手动', 'api': '接口', 'mixed': '混合' };
+                            return map[v] || v || '-';
+                        }
+                    },
+                    { field: 'updateTime', title: '最后修改' },
+                    {
+                        title: '操作', formatter: function (v, row) {
+                            var html = '<button class="btn btn-xs btn-primary" onclick="openDetail(' + row.id + ')">编辑</button>';
+                            if (!row.ownerId) {
+                                html += ' <button class="btn btn-xs btn-success" onclick="claim(' + row.id + ')">认领</button>';
+                            } else {
+                                html += ' <button class="btn btn-xs btn-warning" onclick="returnPublic(' + row.id + ')">退回公共</button>';
+                                html += ' <button class="btn btn-xs btn-info" onclick="transferToUser(' + row.id + ')">转移给人</button>';
+                                if (canTransferDept) {
+                                    html += ' <button class="btn btn-xs btn-danger" onclick="transferToDept(' + row.id + ')">转给部门</button>';
+                                }
+                            }
+                            return html;
+                        }
+                    }
+                ]
+            });
+            loadBadgeCounts(); 
+        });
+
+        function switchTab(type, el) {
+            currentFilterType = type;
+            $('#listTab li').removeClass('active');
+            $(el).parent().addClass('active');
+            loadTable();
+        }
+
+
+        function loadTable() {
+            $('#dataTable').bootstrapTable('refresh', { pageNumber: 1 });
+            loadBadgeCounts();
+        }
+
+        function loadBadgeCounts() {
+            $.post(ctx + 'biz/activeProfile/countByType', {}, function (res) {
+                if (res.code === 0) {
+                    $('#badgeMy').text(res.data.my || 0);
+                    $('#badgePublic').text(res.data.publicCount || 0);
+                    $('#badgeAll').text(res.data.all || 0);
+                }
+            });
+        }
+
+        function addCriminal() {
+            layer.open({
+                type: 2,
+                title: '新增罪犯档案',
+                area: ['600px', '400px'],
+                content: ctx + 'biz/activeProfile/add'
+            });
+        }
+
+        function openDetail(id) {
+            window.location.href = ctx + 'biz/activeProfile/detail/' + id;
+        }
+
+        function claim(id) {
+            if (!confirm('确认认领该档案？')) return;
+            $.post(ctx + 'biz/activeProfile/claim', { id: id }, function (res) {
+                if (res.code === 0) {
+                    layer.msg('认领成功');
+                    loadTable();
+                } else {
+                    layer.msg(res.msg);
+                }
+            });
+        }
+
+        function returnPublic(id) {
+            if (!confirm('确认退回公共？')) return;
+            $.post(ctx + 'biz/activeProfile/returnPublic', { id: id }, function (res) {
+                if (res.code === 0) {
+                    layer.msg('已退回公共');
+                    loadTable();
+                } else {
+                    layer.msg(res.msg);
+                }
+            });
+        }
+
+        function transferToUser(id) {
+            // 先加载用户列表
+            $.get(ctx + 'biz/activeProfile/userList', function (res) {
+                if (res.code !== 0) {
+                    layer.msg('加载用户列表失败');
+                    return;
+                }
+                var users = res.data || [];
+                if (users.length === 0) {
+                    layer.msg('本部门暂无其他用户');
+                    return;
+                }
+                var options = '<option value="">请选择</option>';
+                users.forEach(function (u) {
+                    options += '<option value="' + u.userId + '">' + u.userName + '（' + u.loginName + '）</option>';
+                });
+
+                layer.open({
+                    type: 1,
+                    title: '转移给同事',
+                    area: ['420px', '220px'],
+                    content: '<div style="padding:20px;">' +
+                        '<p>选择目标用户：</p>' +
+                        '<select id="targetUserId" class="form-control">' + options + '</select>' +
+                        '</div>',
+                    btn: ['确定', '取消'],
+                    yes: function (idx) {
+                        var targetUserId = $('#targetUserId').val();
+                        if (!targetUserId) {
+                            layer.msg('请选择目标用户');
+                            return;
+                        }
+                        $.post(ctx + 'biz/activeProfile/transferToUser',
+                            { id: id, targetUserId: targetUserId },
+                            function (res) {
+                                if (res.code === 0) {
+                                    layer.msg('转移成功');
+                                    layer.close(idx);
+                                    loadTable();
+                                } else {
+                                    layer.msg(res.msg);
+                                }
+                            });
+                    }
+                });
+            });
+        }
+
+        function transferToDept(id) {
+            $.get(ctx + 'biz/activeProfile/deptList', function (res) {
+                if (res.code !== 0) {
+                    layer.msg(res.msg || '加载部门失败');
+                    return;
+                }
+                var depts = res.data || [];
+                var options = '<option value="">请选择</option>';
+                depts.forEach(function (d) {
+                    options += '<option value="' + d.deptId + '">' + d.deptName + '</option>';
+                });
+
+                layer.open({
+                    type: 1,
+                    title: '转给部门',
+                    area: ['420px', '220px'],
+                    content: '<div style="padding:20px;">' +
+                        '<p>选择目标部门：</p>' +
+                        '<select id="targetDeptId" class="form-control">' + options + '</select>' +
+                        '</div>',
+                    btn: ['确定', '取消'],
+                    yes: function (idx) {
+                        var targetDeptId = $('#targetDeptId').val();
+                        if (!targetDeptId) {
+                            layer.msg('请选择目标部门');
+                            return;
+                        }
+                        $.post(ctx + 'biz/activeProfile/transferToDept',
+                            { id: id, targetDeptId: targetDeptId },
+                            function (res) {
+                                if (res.code === 0) {
+                                    layer.msg('转移成功');
+                                    layer.close(idx);
+                                    loadTable();
+                                } else {
+                                    layer.msg(res.msg);
+                                }
+                            });
+                    }
+                });
+            });
+        }
+
+        function batchTransfer() {
+            var rows = $('#dataTable').bootstrapTable('getSelections');
+            if (rows.length === 0) { layer.msg('请先勾选档案'); return; }
+            var ids = rows.map(function (r) { return r.id; });
+
+            var userPromise = $.get(ctx + 'biz/activeProfile/userList');
+            var deptPromise = canTransferDept ? $.get(ctx + 'biz/activeProfile/deptList') : null;
+
+            $.when(userPromise, deptPromise).done(function (userRes, deptRes) {
+                var users = userRes[0].data || [];
+                var depts = (deptRes && deptRes[0] && deptRes[0].data) || [];
+
+                var userOptions = '<option value="">请选择</option>';
+                users.forEach(function (u) {
+                    userOptions += '<option value="' + u.userId + '">' + u.userName + '（' + u.loginName + '）</option>';
+                });
+
+                var deptOptions = '<option value="">请选择</option>';
+                depts.forEach(function (d) {
+                    deptOptions += '<option value="' + d.deptId + '">' + d.deptName + '</option>';
+                });
+
+                var typeOptions = '<option value="user">转给人</option>';
+                if (canTransferDept) {
+                    typeOptions += '<option value="dept">转给部门</option>';
+                }
+
+                layer.open({
+                    type: 1,
+                    title: '批量转移',
+                    area: ['450px', '300px'],
+                    content: '<div style="padding:20px;">' +
+                        '<p>转移方式：</p>' +
+                        '<select id="transferType" class="form-control" onchange="toggleTransferInput()">' +
+                        typeOptions +
+                        '</select>' +
+                        '<div id="userInput" style="margin-top:10px;">' +
+                        '  <p>选择目标用户：</p>' +
+                        '  <select id="batchTargetUserId" class="form-control">' + userOptions + '</select>' +
+                        '</div>' +
+                        '<div id="deptInput" style="margin-top:10px;display:none;">' +
+                        '  <p>选择目标部门：</p>' +
+                        '  <select id="batchTargetDeptId" class="form-control">' + deptOptions + '</select>' +
+                        '</div>' +
+                        '</div>',
+                    btn: ['确定', '取消'],
+                    yes: function (idx) {
+                        var type = $('#transferType').val();
+                        var url, data;
+                        if (type === 'user') {
+                            var uid = $('#batchTargetUserId').val();
+                            if (!uid) { layer.msg('请选择目标用户'); return; }
+                            url = ctx + 'biz/activeProfile/batchTransferToUser';
+                            data = { ids: ids, targetUserId: uid };
+                        } else {
+                            var did = $('#batchTargetDeptId').val();
+                            if (!did) { layer.msg('请选择目标部门'); return; }
+                            url = ctx + 'biz/activeProfile/batchTransferToDept';
+                            data = { ids: ids, targetDeptId: did };
+                        }
+                        $.post(url, data, function (res) {
+                            if (res.code === 0) {
+                                layer.msg('转移成功');
+                                layer.close(idx);
+                                loadTable();
+                            } else {
+                                layer.msg(res.msg);
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+
+        function toggleTransferInput() {
+            var type = $('#transferType').val();
+            if (type === 'user') {
+                $('#userInput').show();
+                $('#deptInput').hide();
+            } else {
+                $('#userInput').hide();
+                $('#deptInput').show();
+            }
+        }
+
+    </script>
+</body>
+
+</html>

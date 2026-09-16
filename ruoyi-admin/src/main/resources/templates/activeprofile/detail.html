@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+
+<head th:include="include :: header('罪犯档案详情')"></head>
+
+<body class="gray-bg">
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5 id="title">罪犯档案</h5>
+                        <div class="ibox-tools">
+                            <button class="btn btn-sm btn-primary" onclick="saveAll()">
+                                <i class="fa fa-save"></i> 保存全部
+                            </button>
+                            <button class="btn btn-sm btn-default" onclick="history.back()">返回</button>
+                        </div>
+                    </div>
+                    <div class="ibox-content">
+                        <input type="hidden" id="criminalId" th:value="${criminal.id}">
+                        <input type="hidden" id="criminalBh" th:value="${criminal.bh}">
+                        <input type="hidden" id="criminalXm" th:value="${criminal.xm}">
+
+                        <div class="row">
+                            <div class="col-sm-2" style="border-right:1px solid #e7eaec;">
+                                <ul class="nav nav-pills nav-stacked" id="moduleNav"></ul>
+                            </div>
+                            <div class="col-sm-10">
+                                <div id="formArea"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div th:include="include :: footer"></div>
+    <script th:inline="javascript">
+        var ctx = [[@{/}]];
+        var criminalId = [[${ criminal.id }]];
+        var dataJsonStr = [[${ criminal.dataJson }]];
+        var rawJsonStr = [[${ criminal.rawJson }]];
+
+        // ========== 10 个模块的字段配置 ==========
+        var MODULE_CONFIG = {
+            'module1': {
+                name: '一犯一档分析',
+                fields: [
+                    { code: 'zgjc', label: '专管警察', type: 'text', source: 'manual' },
+                    { code: 'zgsj', label: '专管时间', type: 'date', source: 'manual' },
+                    { code: 'bczy', label: '捕前职业', type: 'text', source: 'api' },
+                    { code: 'csny', label: '出生年月', type: 'date', source: 'api' },
+                    { code: 'jg', label: '籍贯', type: 'text', source: 'api' },
+                    { code: 'rjrq', label: '入监日期', type: 'date', source: 'api' },
+                    { code: 'zm', label: '罪名', type: 'text', source: 'api' },
+                    { code: 'ypxq', label: '原判刑期', type: 'text', source: 'api' },
+                    { code: 'xqzr', label: '刑期止日', type: 'date', source: 'api' },
+                    { code: 'zdzf', label: '重点罪犯', type: 'checkbox', options: ['A类', 'B类', 'CB类'], source: 'api' },
+                    { code: 'slzf', label: '三类罪犯', type: 'radio', options: ['是', '否'], source: 'api' },
+                    { code: 'jtgx', label: '家庭关系', type: 'text', source: 'api' },
+                    { code: 'grsjwp', label: '个人上交物品', type: 'textarea', source: 'manual' },
+                    { code: 'rzfp', label: '认罪服判', type: 'radio', options: ['是', '否'], source: 'api' },
+                    { code: 'rzfpDetail', label: '认罪服判-具体情形', type: 'textarea', source: 'api' },
+                    { code: 'stzk', label: '身体状况', type: 'radio', options: ['一级', '二级', '三级', '其他'], source: 'api' },
+                    { code: 'rjqb', label: '入监前表现', type: 'textarea', source: 'api' },
+                    { code: 'rjpgLevel', label: '入监评估-危险等级', type: 'radio', options: ['极高危', '高危', '中度', '低度'], source: 'api' },
+                    {
+                        code: 'rjpgRisk', label: '入监评估-风险类型', type: 'checkbox',
+                        options: ['自杀', '自伤自残', '行凶', '脱逃', '再犯罪'], source: 'api'
+                    }
+                ]
+            },
+            'module2': {
+                name: '一情一报联动',
+                fields: [
+                    { code: 'hjjcy', label: '互监组成员', type: 'textarea', source: 'api' },
+                    { code: 'yqList', label: '异常狱情（多条）', type: 'list', source: 'api' }
+                ]
+            },
+            'module3': {
+                name: '一时一控维稳',
+                fields: [
+                    { code: 'hjtx_yc', label: '会见通信-异常情况', type: 'text', source: 'manual' },
+                    { code: 'hjtx_cs', label: '会见通信-处置措施', type: 'textarea', source: 'manual' },
+                    { code: 'tstt_yc', label: '提审开庭-异常情况', type: 'text', source: 'manual' },
+                    { code: 'tstt_cs', label: '提审开庭-处置措施', type: 'textarea', source: 'manual' },
+                    { code: 'jyjk_yc', label: '就医健康-异常情况', type: 'text', source: 'manual' },
+                    { code: 'jyjk_cs', label: '就医健康-处置措施', type: 'textarea', source: 'manual' },
+                    { code: 'sxdt_yc', label: '思想动态-异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'sxdt_cs', label: '思想动态-处置措施', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module4': {
+                name: '一诉一化疏导',
+                fields: [
+                    {
+                        code: 'sscz_type', label: '诉求处置-类型', type: 'checkbox',
+                        options: ['家庭变故', '申诉未果', '囚囚关系', '警囚关系', '仇视言行', '涉访涉诉',
+                            '减假暂不达预期', '考核结果不满', '其他'], source: 'manual'
+                    },
+                    { code: 'sscz_yc', label: '诉求处置-异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'sscz_zj', label: '诉求处置-证据固定', type: 'textarea', source: 'manual' },
+                    { code: 'jyzh_fz', label: '教育转化-犯罪原因', type: 'textarea', source: 'manual' },
+                    { code: 'jyzh_xl', label: '教育转化-心理测试', type: 'textarea', source: 'manual' },
+                    { code: 'jyzh_cs', label: '教育转化-转化措施', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module5': {
+                name: '一危一策攻坚',
+                fields: [
+                    { code: 'zqpgDate', label: '中期评估-评估日期', type: 'date', source: 'api' },
+                    {
+                        code: 'zqpgLevel', label: '中期评估-危险等级', type: 'radio',
+                        options: ['极高危', '高危', '中度', '低度'], source: 'api'
+                    },
+                    {
+                        code: 'zqpgRisk', label: '中期评估-风险类型', type: 'checkbox',
+                        options: ['自杀', '自伤自残', '行凶', '脱逃', '再犯罪'], source: 'api'
+                    },
+                    { code: 'jspgDate', label: '即时评估-评估日期', type: 'date', source: 'api' },
+                    {
+                        code: 'jspgLevel', label: '即时评估-危险等级', type: 'radio',
+                        options: ['极高危', '高危', '中度', '低度'], source: 'api'
+                    },
+                    {
+                        code: 'jspgRisk', label: '即时评估-风险类型', type: 'checkbox',
+                        options: ['自杀', '自伤自残', '行凶', '脱逃', '再犯罪'], source: 'api'
+                    },
+                    { code: 'gkz_jsz', label: '管控措施-夹控罪犯', type: 'text', source: 'manual' },
+                    { code: 'gkz_jtcs', label: '管控措施-具体措施', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module6': {
+                name: '一定一查劳动',
+                fields: [
+                    {
+                        code: 'ldgz_type', label: '劳动改造-类型', type: 'checkbox',
+                        options: ['劳动类级变更', '劳动岗位变更', '停工待料', '欠产', '其他'], source: 'manual'
+                    },
+                    { code: 'ldgz_yc', label: '劳动改造-异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'ldjy_gwjn', label: '劳动教育-岗位技能', type: 'text', source: 'manual' },
+                    { code: 'aqsc_yc', label: '安全生产-异常情况', type: 'text', source: 'manual' },
+                    { code: 'aqsc_cs', label: '安全生产-处置措施', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module7': {
+                name: '一案一审查理',
+                fields: [
+                    { code: 'jfkh_yc', label: '计分考核复核-异常情况', type: 'text', source: 'manual' },
+                    { code: 'jfkh_zj', label: '计分考核复核-证据固定', type: 'textarea', source: 'manual' },
+                    { code: 'cyqk_yy', label: '从严情况-原因', type: 'textarea', source: 'manual' },
+                    { code: 'cyqk_zj', label: '从严情况-证据固定', type: 'textarea', source: 'manual' },
+                    { code: 'jx_time', label: '加刑-时间', type: 'date', source: 'manual' },
+                    { code: 'jx_fd', label: '加刑-幅度', type: 'text', source: 'manual' },
+                    { code: 'jx_yy', label: '加刑-原因', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module8': {
+                name: '一释一评预警',
+                fields: [
+                    {
+                        code: 'cjpgLevel', label: '出监评估-危险等级', type: 'radio',
+                        options: ['极高危', '高危', '中度', '低度'], source: 'api'
+                    },
+                    {
+                        code: 'cjpgRisk', label: '出监评估-风险类型', type: 'checkbox',
+                        options: ['自杀', '自伤自残', '行凶', '脱逃', '再犯罪'], source: 'api'
+                    },
+                    { code: 'xsxj_dz', label: '刑释衔接-居住地址', type: 'text', source: 'manual' },
+                    {
+                        code: 'xsxj_fs', label: '刑释衔接-衔接方式', type: 'radio',
+                        options: ['必接必送', '家属接送', '自行返回', '其他'], source: 'manual'
+                    },
+                    { code: 'yqgk', label: '舆情管控', type: 'textarea', source: 'manual' },
+                    {
+                        code: 'yjqk', label: '预警情况', type: 'checkbox',
+                        options: ['报复社会', '涉访涉诉', '家庭关系紧张', '劳动能力低下', '无固定住所', '其他'], source: 'manual'
+                    }
+                ]
+            },
+            'module9': {
+                name: '一班一表管控',
+                fields: [
+                    { code: 'zbld', label: '值班领导', type: 'text', source: 'manual' },
+                    { code: 'fjqld', label: '分监区领导', type: 'text', source: 'manual' },
+                    { code: 'zqjc', label: '执勤警察', type: 'text', source: 'manual' },
+                    { code: 'ycqk', label: '异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'czqk', label: '处置情况', type: 'textarea', source: 'manual' }
+                ]
+            },
+            'module10': {
+                name: '一岗一责处置',
+                fields: [
+                    { code: 'fgld', label: '分管领导', type: 'text', source: 'manual' },
+                    { code: 'fjqld2', label: '分监区领导', type: 'text', source: 'manual' },
+                    { code: 'ycqk2', label: '异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'czqk2', label: '处置情况', type: 'textarea', source: 'manual' }
+                ]
+            }
+        };
+
+        var formData = {};   // 用户填的（data_json）
+        var rawData = {};    // 接口拉的（raw_json）
+        var currentModule = 'module1';
+
+        $(function () {
+            // 解析 dataJson
+            if (dataJsonStr && dataJsonStr !== 'null' && dataJsonStr !== '') {
+                try {
+                    formData = typeof dataJsonStr === 'string' ? JSON.parse(dataJsonStr) : dataJsonStr;
+                } catch (e) { formData = {}; }
+            }
+            // 解析 rawJson
+            if (rawJsonStr && rawJsonStr !== 'null' && rawJsonStr !== '') {
+                try {
+                    rawData = typeof rawJsonStr === 'string' ? JSON.parse(rawJsonStr) : rawJsonStr;
+                } catch (e) { rawData = {}; }
+            }
+
+            var xm = $('#criminalXm').val();
+            var bh = $('#criminalBh').val();
+            $('#title').text(xm + '（' + bh + '） - 动态档案');
+
+            renderNav();
+            switchModule('module1');
+        });
+
+        function renderNav() {
+            var html = '';
+            var first = true;
+            for (var key in MODULE_CONFIG) {
+                var cfg = MODULE_CONFIG[key];
+                html += '<li' + (first ? ' class="active"' : '') + '>';
+                html += '<a href="javascript:void(0)" onclick="switchModule(\'' + key + '\', this)">'
+                    + cfg.name + '</a>';
+                html += '</li>';
+                first = false;
+            }
+            $('#moduleNav').html(html);
+        }
+
+        function switchModule(moduleCode, el) {
+            currentModule = moduleCode;
+            if (el) {
+                $('#moduleNav li').removeClass('active');
+                $(el).parent().addClass('active');
+            }
+            var cfg = MODULE_CONFIG[moduleCode];
+            var moduleData = formData[moduleCode] || {};
+            $('#formArea').html(renderForm(cfg.fields, moduleData));
+        }
+
+        function renderForm(fields, moduleData) {
+            var html = '<div class="form-horizontal">';
+            fields.forEach(function (f) {
+                html += '<div class="form-group">';
+                html += '<label class="col-sm-2 control-label">' + f.label + '：</label>';
+                html += '<div class="col-sm-10">';
+                html += renderField(f, moduleData[f.code]);
+                // 接口字段且有值时，给个标识
+                if (f.source === 'api' && hasRawValue(f.code)) {
+                    html += ' <small style="color:#5cb85c;">（接口数据）</small>';
+                } else if (f.source === 'api') {
+                    html += ' <small style="color:#999;">（接口字段，暂未同步）</small>';
+                }
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // 判断 rawJson 里当前模块的这个字段是否有值
+        function hasRawValue(fieldCode) {
+            return rawData[currentModule]
+                && rawData[currentModule][fieldCode] != null
+                && rawData[currentModule][fieldCode] !== '';
+        }
+
+        function renderField(f, value) {
+            var isApiField = (f.source === 'api');
+            var apiValue = null;
+
+            if (isApiField && hasRawValue(f.code)) {
+                apiValue = rawData[currentModule][f.code];
+            }
+
+            var v = apiValue != null ? apiValue : (value == null ? '' : value);
+            var disabled = (isApiField && apiValue != null) ? 'disabled' : '';
+            var name = f.code;
+
+            if (f.type === 'text') {
+                return '<input type="text" class="form-control" name="' + name
+                    + '" value="' + v + '" ' + disabled + '>';
+            }
+            if (f.type === 'date') {
+                return '<input type="date" class="form-control" name="' + name
+                    + '" value="' + v + '" ' + disabled + '>';
+            }
+            if (f.type === 'textarea') {
+                return '<textarea class="form-control" name="' + name
+                    + '" rows="2" ' + disabled + '>' + v + '</textarea>';
+            }
+            if (f.type === 'radio') {
+                var html = '';
+                f.options.forEach(function (opt) {
+                    var checked = (v === opt) ? 'checked' : '';
+                    html += '<label class="radio-inline">'
+                        + '<input type="radio" name="' + name + '" value="' + opt
+                        + '" ' + checked + ' ' + disabled + '> ' + opt + '</label>';
+                });
+                return html;
+            }
+            if (f.type === 'checkbox') {
+                var arr = Array.isArray(v) ? v : (v ? v.split(',') : []);
+                var html = '';
+                f.options.forEach(function (opt) {
+                    var checked = arr.indexOf(opt) > -1 ? 'checked' : '';
+                    html += '<label class="checkbox-inline">'
+                        + '<input type="checkbox" name="' + name + '" value="' + opt
+                        + '" ' + checked + ' ' + disabled + '> ' + opt + '</label>';
+                });
+                return html;
+            }
+            if (f.type === 'list') {
+                return '<textarea class="form-control" name="' + name
+                    + '" rows="4" placeholder="JSON 格式，多条">'
+                    + (v ? JSON.stringify(v) : '') + '</textarea>';
+            }
+            return '<input type="text" class="form-control" name="' + name
+                + '" value="' + v + '" ' + disabled + '>';
+        }
+
+        // 收集当前模块的表单数据
+        function collectModuleData(moduleCode) {
+            var cfg = MODULE_CONFIG[moduleCode];
+            var data = {};
+            cfg.fields.forEach(function (f) {
+                // 接口字段有值 → 跳过，不覆盖
+                if (f.source === 'api' && rawData[moduleCode]
+                    && rawData[moduleCode][f.code] != null
+                    && rawData[moduleCode][f.code] !== '') {
+                    return;
+                }
+                if (f.type === 'checkbox') {
+                    var arr = [];
+                    $('input[name="' + f.code + '"]:checked').each(function () {
+                        arr.push($(this).val());
+                    });
+                    data[f.code] = arr;
+                } else if (f.type === 'radio') {
+                    data[f.code] = $('input[name="' + f.code + '"]:checked').val() || '';
+                } else if (f.type === 'list') {
+                    var raw = $('[name="' + f.code + '"]').val();
+                    try {
+                        data[f.code] = raw ? JSON.parse(raw) : [];
+                    } catch (e) {
+                        data[f.code] = raw;
+                    }
+                } else {
+                    data[f.code] = $('[name="' + f.code + '"]').val() || '';
+                }
+            });
+            return data;
+        }
+
+        function saveAll() {
+            var allData = {};
+            for (var key in MODULE_CONFIG) {
+                if (key === currentModule) {
+                    allData[key] = collectModuleData(key);
+                } else {
+                    allData[key] = formData[key] || {};
+                }
+            }
+            var dataJson = JSON.stringify(allData);
+
+            $.ajax({
+                url: ctx + 'biz/activeProfile/edit',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    id: criminalId,
+                    dataJson: dataJson
+                }),
+                success: function (res) {
+                    if (res.code === 0) {
+                        layer.msg('保存成功');
+                        formData = allData;
+                    } else {
+                        layer.msg(res.msg);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
