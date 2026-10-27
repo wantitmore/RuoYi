@@ -5,8 +5,10 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -25,6 +27,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.service.ISysDeptService;
@@ -63,8 +66,34 @@ public class QuarterController extends BaseController {
     private String prefix = "quarter";
 
     /**
-     * 打开季度考核列表页
+     * 校验目标部门是否在当前登录用户的数据权限范围内。
+     * <p>
+     * 超管直接放行（deptId 可空，表示全部部门，保持原有汇总语义）；
+     * 非超管则目标 deptId 必须落在 {@code selectDeptList}（已带 @DataScope，按角色数据范围过滤）的可见部门集合内，
+     * 否则抛出 {@link ServiceException} 拒绝越权访问。
+     *
+     * @param deptId 前端传入的目标部门ID（可为空）
+     * @return 校验通过时返回原 deptId（超管可返回 null）
+     * @throws ServiceException 越权时抛出
      */
+    private Long checkDeptInScope(Long deptId) {
+        SysUser user = ShiroUtils.getSysUser();
+        if (user.isAdmin()) {
+            return deptId;
+        }
+        if (deptId == null) {
+            return null;
+        }
+        Set<Long> visibleIds = deptService.selectDeptList(new SysDept()).stream()
+                .map(SysDept::getDeptId)
+
+                .collect(Collectors.toCollection(HashSet::new));
+        if (!visibleIds.contains(deptId)) {
+            throw new ServiceException("无权查看该部门数据");
+        }
+        return deptId;
+    }
+
     @RequiresPermissions("quarter:view")
     @GetMapping("/list")
     public String list(@RequestParam(required = false, defaultValue = "quarter") String type, ModelMap mmap) {
@@ -111,6 +140,9 @@ public class QuarterController extends BaseController {
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false, defaultValue = "quarter") String type) {
 
+        // 数据权限：校验目标部门是否在当前用户可见范围内，防止伪造 deptId 越权
+        deptId = checkDeptInScope(deptId);
+
         SysUser currentUser = ShiroUtils.getSysUser();
 
         // 1. 查询该部门该季度的评分记录
@@ -145,13 +177,12 @@ public class QuarterController extends BaseController {
             return success().put("data", Collections.emptyMap());
         }
 
-        // 4. 过滤出属于固定岗位的用户
+                // 4. 过滤出属于固定岗位的用户
+        // 缓存每个用户的岗位列表，避免对同一用户重复调用 selectPostsByUserId（消除 N+1）
+        Map<Long, List<SysPost>> postCache = new HashMap<>();
         List<SysUser> filteredUsers = new ArrayList<>();
         for (SysUser user : allUsers) {
-            List<SysPost> allUserPosts = postService.selectPostsByUserId(user.getUserId());
-            List<SysPost> actualPosts = allUserPosts.stream()
-                    .filter(SysPost::isFlag)
-                    .collect(Collectors.toList());
+            List<SysPost> actualPosts = getPostsByUserId(postCache, user.getUserId());
 
             // 判断是否有岗位在目标列表中
             boolean hasTargetPost = actualPosts.stream()
@@ -168,9 +199,7 @@ public class QuarterController extends BaseController {
             if (StringUtils.isNotEmpty(currentZone)) {
                 filteredUsers = filteredUsers.stream()
                         .filter(user -> {
-                            List<SysPost> posts = postService.selectPostsByUserId(user.getUserId());
-                            String postName = posts.stream()
-                                    .filter(SysPost::isFlag)
+                            String postName = getPostsByUserId(postCache, user.getUserId()).stream()
                                     .findFirst()
                                     .map(SysPost::getPostName)
                                     .orElse("");
@@ -198,14 +227,9 @@ public class QuarterController extends BaseController {
             Map<String, Object> row = new HashMap<>();
             row.put("userId", user.getUserId());
             row.put("userName", user.getUserName());
-            row.put("deptName", user.getDept() != null ? user.getDept().getDeptName() : "");
-            // 注意：岗位名称直接从 userPosts 中取第一个（或根据排序取）
-            List<SysPost> allUserPosts = postService.selectPostsByUserId(user.getUserId());
-            List<SysPost> actualPosts = allUserPosts.stream()
-                    .filter(SysPost::isFlag)
-                    .collect(Collectors.toList());
-
-            String postName = actualPosts.stream()
+                        row.put("deptName", user.getDept() != null ? user.getDept().getDeptName() : "");
+            // 岗位名称：复用过滤阶段的岗位缓存，避免重复查询
+            String postName = getPostsByUserId(postCache, user.getUserId()).stream()
                     .filter(p -> targetPostCodes.contains(p.getPostCode()))
                     .findFirst()
                     .map(SysPost::getPostName)
@@ -279,6 +303,28 @@ public class QuarterController extends BaseController {
         Long deptId = ShiroUtils.getSysUser().getDeptId();
         String loginName = ShiroUtils.getLoginName();
 
+        // 越权校验：非超管只能对自己数据权限范围内的用户打分。
+        // 通过 selectUserList(@DataScope) 拿到当前用户可见人员白名单，
+        // 校验 grades 中的每个 userId 是否落在白名单内，防止伪造 userId 给其他部门人员打分。
+        Set<Long> allowedUserIds = null;
+        if (!ShiroUtils.getSysUser().isAdmin()) {
+            allowedUserIds = userService.selectUserList(new SysUser()).stream()
+                    .map(SysUser::getUserId)
+                    .collect(Collectors.toCollection(HashSet::new));
+        }
+
+        // 先对所有被考核人做一次范围校验，有任何越权直接拒绝整批
+        for (Map<String, Object> g : grades) {
+            Object userIdObj = g.get("userId");
+            if (userIdObj == null) {
+                continue;
+            }
+            Long userId = Long.valueOf(userIdObj.toString());
+            if (allowedUserIds != null && !allowedUserIds.contains(userId)) {
+                return error("无权对用户[" + userId + "]进行评分");
+            }
+        }
+
         for (Map<String, Object> g : grades) {
             Long userId = Long.valueOf(g.get("userId").toString());
             String grade = (String) g.get("grade");
@@ -335,6 +381,22 @@ public class QuarterController extends BaseController {
         }
     }
 
+    /**
+     * 获取用户实际拥有的岗位列表（flag=true），带本地缓存避免 N+1 查询。
+     * <p>
+     * {@code selectPostsByUserId} 返回的是"全部岗位 + flag 标记"，此处只保留用户真正拥有的岗位。
+     * 同一请求内对同一 userId 只查询一次。
+     *
+     * @param cache  本次请求内的岗位缓存
+     * @param userId 用户ID
+     * @return 用户实际拥有的岗位列表
+     */
+    private List<SysPost> getPostsByUserId(Map<Long, List<SysPost>> cache, Long userId) {
+        return cache.computeIfAbsent(userId, id -> postService.selectPostsByUserId(id).stream()
+                .filter(SysPost::isFlag)
+                .collect(Collectors.toList()));
+    }
+
     private String extractZone(List<SysPost> posts) {
         String postName = posts.stream()
                 .filter(SysPost::isFlag)
@@ -353,11 +415,14 @@ public class QuarterController extends BaseController {
     /**
      * 统计结果
      */
+    @RequiresPermissions("quarter:list")
     @ResponseBody
     @GetMapping("/stats")
     public AjaxResult stats(@RequestParam String batchNo,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false, defaultValue = "quarter") String type) {
+        // 数据权限：校验目标部门是否在当前用户可见范围内，防止伪造 deptId 越权
+        deptId = checkDeptInScope(deptId);
         // 权限处理
         System.out.println("=== stats: batchNo=" + batchNo + ", deptId=" + deptId + ", type=" + type);
         // 1. 获取该批次该部门所有评分记录
@@ -380,12 +445,12 @@ public class QuarterController extends BaseController {
             return success().put("data", Collections.emptyList());
         }
 
-        // 4. 过滤出被考核人（拥有目标岗位的用户）
+                // 4. 过滤出被考核人（拥有目标岗位的用户）
+        // 缓存每个用户的岗位列表，避免对同一用户重复调用 selectPostsByUserId（消除 N+1）
+        Map<Long, List<SysPost>> postCache = new HashMap<>();
         List<SysUser> targetUsers = new ArrayList<>();
         for (SysUser user : allUsers) {
-            List<SysPost> userPosts = postService.selectPostsByUserId(user.getUserId());
-            boolean isTarget = userPosts.stream()
-                    .filter(SysPost::isFlag)
+            boolean isTarget = getPostsByUserId(postCache, user.getUserId()).stream()
                     .map(SysPost::getPostCode)
                     .anyMatch(targetPostCodes::contains);
             if (isTarget) {
@@ -401,9 +466,8 @@ public class QuarterController extends BaseController {
             row.put("userId", user.getUserId());
             row.put("userName", user.getUserName());
 
-            // 岗位名称
-            String postName = postService.selectPostsByUserId(user.getUserId()).stream()
-                    .filter(SysPost::isFlag)
+                        // 岗位名称：复用岗位缓存，避免重复查询
+            String postName = getPostsByUserId(postCache, user.getUserId()).stream()
                     .filter(p -> targetPostCodes.contains(p.getPostCode()))
                     .findFirst()
                     .map(SysPost::getPostName)
@@ -441,8 +505,8 @@ public class QuarterController extends BaseController {
 
         // 排序：已评分的按平均分降序，未评分的排最后
         result.sort((a, b) -> {
-            double scoreA = (double) a.get("avgScore");
-            double scoreB = (double) b.get("avgScore");
+            double scoreA = ((Number) a.get("avgScore")).doubleValue();
+            double scoreB = ((Number) b.get("avgScore")).doubleValue();
             if (scoreA == 0 && scoreB == 0)
                 return 0;
             if (scoreA == 0)
@@ -455,6 +519,7 @@ public class QuarterController extends BaseController {
         return success().put("data", result);
     }
 
+    @RequiresPermissions("quarter:view")
     @GetMapping("/statsPage")
     public String statsPage() {
         return "quarter/stats";
