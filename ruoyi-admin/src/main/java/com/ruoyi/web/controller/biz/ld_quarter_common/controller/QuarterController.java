@@ -286,17 +286,15 @@ public class QuarterController extends BaseController {
             return error("没有评分数据");
         }
 
-        // 2. 校验：该因素下只能有一个人被评为“好”
+                // 2. 校验：该因素下只能有一个人被评为“好”（仅分区领导季度考核 quarter 强制限制）
+        //    普通员工考核(common)的 35% 比例仅作前端提醒，允许超过，故后端不再拦截。
         long goodCount = grades.stream()
                 .filter(g -> "好".equals(g.get("grade")))
                 .count();
 
-        var totalPeople = grades.size();
         if (goodCount > 1 && "quarter".equals(type)) {
             // 直接返回错误，不执行保存
             return error("每个考察因素只能有一个人被评为“好”，当前有 " + goodCount + " 人");
-        } else if (goodCount > Math.max(1, Math.ceil(totalPeople * 0.35)) && "common".equals(type)) {
-            return error("每个考察因素只能35%被评为“好”");
         }
 
         // 3. 保存逻辑

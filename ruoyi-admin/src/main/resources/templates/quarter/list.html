@@ -214,21 +214,24 @@
                 }
             });
 
-            // 检查是否有因素超过1个“好”
+                        // 检查是否有因素超过1个“好”
             for (var factorId in factorGoodCount) {
 
                 if (type === 'quarter') {
-                    // 监区领导考核：好 ≤ 1
+                    // 监区领导考核：好 ≤ 1（强制限制）
                     if (factorGoodCount[factorId] > 1) {
                         alert("每个因素只能有1人评为“好”");
                         return;
                     }
                 } else if (type === 'common') {
                     // 普通员工考核：好 ≤ 总人数 × 35%（向上取整，至少1人）
+                    // 超过时仅提醒，用户确认后仍可继续保存
                     var maxGood = Math.max(1, Math.ceil(totalPeople * 0.35));
                     if (factorGoodCount[factorId] > maxGood) {
-                        alert("本次评分中“好”的比例不能超过35%（本次共评" + totalPeople + "人，最多允许" + maxGood + "个“好”），当前有" + factorGoodCount[factorId] + "个");
-                        return;
+                        var goOn = confirm("提醒：本次评分中“好”的比例已超过35%（本次共评" + totalPeople + "人，建议最多" + maxGood + "个“好”），当前有" + factorGoodCount[factorId] + "个。\n是否仍要继续保存？");
+                        if (!goOn) {
+                            return;
+                        }
                     }
                 }
             }
