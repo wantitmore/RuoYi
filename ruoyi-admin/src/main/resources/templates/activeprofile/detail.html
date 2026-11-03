@@ -41,6 +41,9 @@
         var criminalId = [[${ criminal.id }]];
         var dataJsonStr = [[${ criminal.dataJson }]];
         var rawJsonStr = [[${ criminal.rawJson }]];
+        var formData = {};   // 用户填的（data_json）
+        var rawData = {};    // 接口拉的（raw_json）
+        var currentModule = '';
 
         // ========== 10 个模块的字段配置 ==========
         var MODULE_CONFIG = {
@@ -244,6 +247,12 @@
         }
 
         function switchModule(moduleCode, el) {
+            // ★ 关键：增加 $('#formArea').children().length > 0 判断
+            // 确保页面上已经有内容了，再去收集，否则会把空表单收集覆盖掉真实数据
+            if (currentModule && MODULE_CONFIG[currentModule] && $('#formArea').children().length > 0) {
+                formData[currentModule] = collectModuleData(currentModule);
+            }
+
             currentModule = moduleCode;
             if (el) {
                 $('#moduleNav li').removeClass('active');
@@ -386,16 +395,15 @@
         }
 
         function saveAll() {
-            var allData = {};
-            for (var key in MODULE_CONFIG) {
-                if (key === currentModule) {
-                    allData[key] = collectModuleData(key);
-                } else {
-                    allData[key] = formData[key] || {};
-                }
+            // 1. 保存前，把当前正在显示的模块的最新数据也收进来
+            if (currentModule && MODULE_CONFIG[currentModule]) {
+                formData[currentModule] = collectModuleData(currentModule);
             }
-            var dataJson = JSON.stringify(allData);
 
+            // 2. 此时 formData 里已经是 10 个模块的最新数据了，直接转字符串
+            var dataJson = JSON.stringify(formData);
+
+            // 3. 提交到后端
             $.ajax({
                 url: ctx + 'biz/activeProfile/edit',
                 type: 'POST',
@@ -407,7 +415,8 @@
                 success: function (res) {
                     if (res.code === 0) {
                         layer.msg('保存成功');
-                        formData = allData;
+                        // 保存成功后，重新加载一下页面数据（可选，防止数据状态不同步）
+                        // window.location.reload(); 
                     } else {
                         layer.msg(res.msg);
                     }
