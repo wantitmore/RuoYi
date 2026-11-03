@@ -8,6 +8,8 @@ package com.ruoyi.web.controller.biz.activeprofile.service;
 
 import java.util.List;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.web.controller.biz.activeprofile.domain.BizCriminal;
 
@@ -46,4 +48,6 @@ public interface IBizCriminalService {
     List<SysDept> selectAllDepts();
 
     int upsertBySync(BizCriminal record);
+
+    String importExcel(MultipartFile file);
 }

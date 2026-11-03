@@ -48,21 +48,21 @@
                 name: '一犯一档分析',
                 fields: [
                     { code: 'zgjc', label: '专管警察', type: 'text', source: 'manual' },
-                    { code: 'zgsj', label: '专管时间', type: 'date', source: 'manual' },
+                    { code: 'zgsj', label: '专管时间', type: 'text', source: 'manual' },
                     { code: 'bczy', label: '捕前职业', type: 'text', source: 'api' },
-                    { code: 'csny', label: '出生年月', type: 'date', source: 'api' },
+                    { code: 'csny', label: '出生年月', type: 'text', source: 'api' },
                     { code: 'jg', label: '籍贯', type: 'text', source: 'api' },
-                    { code: 'rjrq', label: '入监日期', type: 'date', source: 'api' },
+                    { code: 'rjrq', label: '入监日期', type: 'text', source: 'api' },
                     { code: 'zm', label: '罪名', type: 'text', source: 'api' },
                     { code: 'ypxq', label: '原判刑期', type: 'text', source: 'api' },
-                    { code: 'xqzr', label: '刑期止日', type: 'date', source: 'api' },
+                    { code: 'xqzr', label: '刑期止日', type: 'text', source: 'api' },
                     { code: 'zdzf', label: '重点罪犯', type: 'checkbox', options: ['A类', 'B类', 'C类'], source: 'api' },
-                    { code: 'slzf', label: '三类罪犯', type: 'radio', options: ['是', '否'], source: 'api' },
+                    { code: 'slzf', label: '三类罪犯', type: 'text', source: 'api' },
                     { code: 'jtgx', label: '家庭关系', type: 'text', source: 'api' },
                     { code: 'grsjwp', label: '个人上交物品', type: 'textarea', source: 'manual' },
                     { code: 'rzfp', label: '认罪服判', type: 'radio', options: ['是', '否'], source: 'api' },
                     { code: 'rzfpDetail', label: '认罪服判-具体情形', type: 'textarea', source: 'api' },
-                    { code: 'stzk', label: '身体状况', type: 'radio', options: ['一级', '二级', '三级', '其他'], source: 'api' },
+                    { code: 'stzk', label: '身体状况', type: 'text', source: 'api' },
                     { code: 'rjqb', label: '入监前表现', type: 'textarea', source: 'api' },
                     { code: 'rjpgLevel', label: '入监评估-危险等级', type: 'radio', options: ['极高危', '高危', '中度', '低度'], source: 'api' },
                     {
@@ -75,7 +75,10 @@
                 name: '一情一报联动',
                 fields: [
                     { code: 'hjjcy', label: '互监组成员', type: 'textarea', source: 'api' },
-                    { code: 'yqList', label: '异常狱情（多条）', type: 'list', source: 'api' }
+                    { code: 'yqList', label: '异常狱情记录', type: 'custom_list', source: 'api' },
+                    { code: 'qclwqk', label: '清查两违一危情况', type: 'textarea', source: 'api' },
+                    { code: 'qclwcs', label: '清查两违一危处置措施', type: 'textarea', source: 'api' }
+
                 ]
             },
             'module3': {
@@ -109,7 +112,7 @@
             'module5': {
                 name: '一危一策攻坚',
                 fields: [
-                    { code: 'zqpgDate', label: '中期评估-评估日期', type: 'date', source: 'api' },
+                    { code: 'zqpgDate', label: '中期评估-评估日期', type: 'text', source: 'api' },
                     {
                         code: 'zqpgLevel', label: '中期评估-危险等级', type: 'radio',
                         options: ['极高危', '高危', '中度', '低度'], source: 'api'
@@ -118,7 +121,7 @@
                         code: 'zqpgRisk', label: '中期评估-风险类型', type: 'checkbox',
                         options: ['自杀', '自伤自残', '行凶', '脱逃', '再犯罪'], source: 'api'
                     },
-                    { code: 'jspgDate', label: '即时评估-评估日期', type: 'date', source: 'api' },
+                    { code: 'jspgDate', label: '即时评估-评估日期', type: 'text', source: 'api' },
                     {
                         code: 'jspgLevel', label: '即时评估-危险等级', type: 'radio',
                         options: ['极高危', '高危', '中度', '低度'], source: 'api'
@@ -251,21 +254,43 @@
             $('#formArea').html(renderForm(cfg.fields, moduleData));
         }
 
+        // 在 renderForm 里，给字段加个特殊判断
         function renderForm(fields, moduleData) {
             var html = '<div class="form-horizontal">';
             fields.forEach(function (f) {
                 html += '<div class="form-group">';
                 html += '<label class="col-sm-2 control-label">' + f.label + '：</label>';
                 html += '<div class="col-sm-10">';
-                html += renderField(f, moduleData[f.code]);
-                // 接口字段且有值时，给个标识
-                if (f.source === 'api' && hasRawValue(f.code)) {
-                    html += ' <small style="color:#5cb85c;">（接口数据）</small>';
-                } else if (f.source === 'api') {
-                    html += ' <small style="color:#999;">（接口字段，暂未同步）</small>';
+
+                // 如果是 custom_list 类型，渲染表格和按钮
+                if (f.type === 'custom_list') {
+                    var listData = moduleData[f.code] || [];
+                    // 用隐藏域暂存数据
+                    var hiddenVal = JSON.stringify(listData).replace(/"/g, '&quot;');
+                    html += '<input type="hidden" id="hidden_' + f.code + '" value="' + hiddenVal + '">';
+
+                    html += '<div style="margin-bottom:10px;">';
+                    html += '<button type="button" class="btn btn-sm btn-success" onclick="openYqModal(\'' + f.code + '\')"><i class="fa fa-plus"></i> 新增异常狱情</button>';
+                    html += '</div>';
+
+                    html += '<table class="table table-bordered table-striped" style="font-size:13px;">';
+                    html += '<thead><tr><th width="50">序号</th><th width="80">等级</th><th>情形</th><th>采取/处置措施</th><th width="60">操作</th></tr></thead>';
+                    html += '<tbody id="tbody_' + f.code + '"></tbody>';
+                    html += '</table>';
+
+                    // 延迟一点渲染表格数据
+                    setTimeout(function () { renderYqTable(f.code); }, 100);
+
+                } else {
+                    // 原有普通字段渲染逻辑
+                    html += renderField(f, moduleData[f.code]);
+                    if (f.source === 'api' && hasRawValue(f.code)) {
+                        html += ' <small style="color:#5cb85c;">（接口数据）</small>';
+                    } else if (f.source === 'api') {
+                        html += ' <small style="color:#999;">（接口字段，暂未同步）</small>';
+                    }
                 }
-                html += '</div>';
-                html += '</div>';
+                html += '</div></div>';
             });
             html += '</div>';
             return html;
@@ -337,13 +362,15 @@
             var cfg = MODULE_CONFIG[moduleCode];
             var data = {};
             cfg.fields.forEach(function (f) {
-                // 接口字段有值 → 跳过，不覆盖
-                if (f.source === 'api' && rawData[moduleCode]
-                    && rawData[moduleCode][f.code] != null
-                    && rawData[moduleCode][f.code] !== '') {
-                    return;
+                if (f.source === 'api' && hasRawValue(f.code)) {
+                    return; // 接口已有数据则跳过
                 }
-                if (f.type === 'checkbox') {
+
+                if (f.type === 'custom_list') {
+                    // 读取隐藏域里的数据
+                    var val = $('#hidden_' + f.code).val();
+                    data[f.code] = JSON.parse(val || '[]');
+                } else if (f.type === 'checkbox') {
                     var arr = [];
                     $('input[name="' + f.code + '"]:checked').each(function () {
                         arr.push($(this).val());
@@ -351,13 +378,6 @@
                     data[f.code] = arr;
                 } else if (f.type === 'radio') {
                     data[f.code] = $('input[name="' + f.code + '"]:checked').val() || '';
-                } else if (f.type === 'list') {
-                    var raw = $('[name="' + f.code + '"]').val();
-                    try {
-                        data[f.code] = raw ? JSON.parse(raw) : [];
-                    } catch (e) {
-                        data[f.code] = raw;
-                    }
                 } else {
                     data[f.code] = $('[name="' + f.code + '"]').val() || '';
                 }
@@ -393,6 +413,77 @@
                     }
                 }
             });
+        }
+
+        // 1. 打开新增弹窗
+        function openYqModal(fieldCode) {
+            var html = '<div style="padding:20px;">' +
+                '<div class="form-group"><label>等级：</label><select id="yqLevel" class="form-control"><option value="三级">三级</option><option value="二级">二级</option><option value="一级">一级</option></select></div>' +
+                '<div class="form-group"><label>情形：</label><textarea id="yqDetail" class="form-control" rows="2" placeholder=""></textarea></div>' +
+                '<div class="form-group"><label>采取/处置措施：</label><textarea id="yqAction" class="form-control" rows="2" placeholder=""></textarea></div>' +
+                '</div>';
+
+            layer.open({
+                type: 1,
+                title: '新增异常狱情',
+                area: ['500px', '350px'],
+                content: html,
+                btn: ['确定', '取消'],
+                yes: function (index) {
+                    var level = $('#yqLevel').val();
+                    var detail = $('#yqDetail').val();
+                    var action = $('#yqAction').val();
+
+                    if (!detail || !action) { layer.msg('请填写完整信息'); return; }
+
+                    // 获取现有数据
+                    var hiddenInput = $('#hidden_' + fieldCode);
+                    var list = JSON.parse(hiddenInput.val() || '[]');
+
+                    // 添加新数据
+                    list.push({ level: level, detail: detail, action: action });
+
+                    // 更新隐藏域并重新渲染表格
+                    hiddenInput.val(JSON.stringify(list));
+                    renderYqTable(fieldCode);
+                    layer.close(index);
+                }
+            });
+        }
+
+        // 2. 渲染表格数据
+        function renderYqTable(fieldCode) {
+            var hiddenInput = $('#hidden_' + fieldCode);
+            if (hiddenInput.length === 0) return;
+
+            var list = JSON.parse(hiddenInput.val() || '[]');
+            var tbody = $('#tbody_' + fieldCode);
+            tbody.empty();
+
+            if (list.length === 0) {
+                tbody.append('<tr><td colspan="5" class="text-center text-muted">暂无异常狱情记录</td></tr>');
+                return;
+            }
+
+            list.forEach(function (item, idx) {
+                var tr = '<tr>';
+                tr += '<td>' + (idx + 1) + '</td>';
+                tr += '<td>' + item.level + '</td>';
+                tr += '<td>' + (item.detail || '') + '</td>';
+                tr += '<td>' + (item.action || '') + '</td>';
+                tr += '<td><button type="button" class="btn btn-xs btn-danger" onclick="deleteYqRecord(\'' + fieldCode + '\', ' + idx + ')"><i class="fa fa-trash"></i></button></td>';
+                tr += '</tr>';
+                tbody.append(tr);
+            });
+        }
+
+        // 3. 删除单条记录
+        function deleteYqRecord(fieldCode, index) {
+            var hiddenInput = $('#hidden_' + fieldCode);
+            var list = JSON.parse(hiddenInput.val() || '[]');
+            list.splice(index, 1);
+            hiddenInput.val(JSON.stringify(list));
+            renderYqTable(fieldCode);
         }
     </script>
 </body>
