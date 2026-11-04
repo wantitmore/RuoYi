@@ -136,7 +136,7 @@
 
         function loadData() {
             var weekVal = $("#weekPicker").val();
-            if (!weekVal) { alert("请选择检查周"); return; }
+            if (!weekVal) { alert("请选择检查周！"); return; }
             var currentWeek = getCurrentWeek();
             var isEditable = (weekVal === currentWeek && canEdit);
             // 将 weekVal (如 "2025-W12") 转换为该周周一日期，或直接传给后端
@@ -156,7 +156,7 @@
                     { key: 'noBook', label: '无册点名' },
                     { key: 'keyPerson', label: '重点罪犯掌握情况' },
                     { key: 'dutyFamiliar', label: '两个职责熟悉情况' },
-                    { key: 'knowledgeFamiliar', label: '应知应会掌握情况' },
+                    { key: 'knowledgeMastery', label: '应知应会掌握情况' },
                     { key: 'other', label: '其他' },
                     { key: 'checkDate', label: '日期' }
                 ];
