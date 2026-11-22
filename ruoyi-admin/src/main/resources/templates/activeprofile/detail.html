@@ -59,7 +59,7 @@
                     { code: 'zm', label: '罪名', type: 'text', source: 'api' },
                     { code: 'ypxq', label: '原判刑期', type: 'text', source: 'api' },
                     { code: 'xqzr', label: '刑期止日', type: 'text', source: 'api' },
-                    { code: 'zdzf', label: '重点罪犯', type: 'checkbox', options: ['A类', 'B类', 'C类'], source: 'api' },
+                    { code: 'zdzf', label: '重点罪犯', type: 'checkbox', options: ['A类', 'B类', 'C类', 'D类'], source: 'api' },
                     { code: 'slzf', label: '三类罪犯', type: 'text', source: 'api' },
                     { code: 'jtgx', label: '家庭关系', type: 'text', source: 'api' },
                     { code: 'grsjwp', label: '个人上交物品', type: 'textarea', source: 'manual' },
@@ -144,7 +144,7 @@
                         code: 'ldgz_type', label: '劳动改造-类型', type: 'checkbox',
                         options: ['劳动类级变更', '劳动岗位变更', '停工待料', '欠产', '其他'], source: 'manual'
                     },
-                    { code: 'ldgz_yc', label: '劳动改造-异常情况', type: 'textarea', source: 'manual' },
+                    { code: 'ldgz_yc', label: '劳动改造-具体情况', type: 'textarea', source: 'manual' },
                     { code: 'ldjy_gwjn', label: '劳动教育-岗位技能', type: 'text', source: 'manual' },
                     { code: 'aqsc_yc', label: '安全生产-异常情况', type: 'text', source: 'manual' },
                     { code: 'aqsc_cs', label: '安全生产-处置措施', type: 'textarea', source: 'manual' }
@@ -447,7 +447,22 @@
 
                     // 获取现有数据
                     var hiddenInput = $('#hidden_' + fieldCode);
-                    var list = JSON.parse(hiddenInput.val() || '[]');
+                    var rawVal = hiddenInput.val();
+
+                    // ★ 核心修复：容错解析，确保 list 绝对是数组
+                    var list = [];
+                    try {
+                        var parsed = JSON.parse(rawVal || '[]');
+                        if (Array.isArray(parsed)) {
+                            list = parsed;
+                        } else if (parsed && typeof parsed === 'object') {
+                            // 如果原本是个对象，包装成数组
+                            list = [parsed];
+                        }
+                    } catch (e) {
+                        // 如果解析报错（比如是纯文本），就重置为空数组
+                        list = [];
+                    }
 
                     // 添加新数据
                     list.push({ level: level, detail: detail, action: action });
@@ -465,7 +480,19 @@
             var hiddenInput = $('#hidden_' + fieldCode);
             if (hiddenInput.length === 0) return;
 
-            var list = JSON.parse(hiddenInput.val() || '[]');
+            var rawVal = hiddenInput.val();
+            var list = [];
+            try {
+                var parsed = JSON.parse(rawVal || '[]');
+                if (Array.isArray(parsed)) {
+                    list = parsed;
+                } else if (parsed && typeof parsed === 'object') {
+                    list = [parsed];
+                }
+            } catch (e) {
+                list = [];
+            }
+
             var tbody = $('#tbody_' + fieldCode);
             tbody.empty();
 
@@ -477,7 +504,7 @@
             list.forEach(function (item, idx) {
                 var tr = '<tr>';
                 tr += '<td>' + (idx + 1) + '</td>';
-                tr += '<td>' + item.level + '</td>';
+                tr += '<td>' + (item.level || '') + '</td>';
                 tr += '<td>' + (item.detail || '') + '</td>';
                 tr += '<td>' + (item.action || '') + '</td>';
                 tr += '<td><button type="button" class="btn btn-xs btn-danger" onclick="deleteYqRecord(\'' + fieldCode + '\', ' + idx + ')"><i class="fa fa-trash"></i></button></td>';

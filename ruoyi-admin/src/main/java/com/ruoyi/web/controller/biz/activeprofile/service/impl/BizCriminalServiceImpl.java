@@ -24,6 +24,7 @@ import com.alibaba.fastjson.TypeReference;
 import com.ruoyi.common.annotation.DataScope;
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
@@ -57,7 +58,18 @@ public class BizCriminalServiceImpl implements IBizCriminalService {
     public int insertCriminal(BizCriminal record) {
 
         // 囚号唯一性校验
-        BizCriminal exist = criminalMapper.selectCriminalByBh(record.getBh());
+        if (StringUtils.isBlank(record.getBh())) {
+            throw new ServiceException("囚号不能为空");
+        }
+        if (StringUtils.isBlank(record.getXm())) {
+            throw new ServiceException("姓名不能为空");
+        }
+
+        BizCriminal exist = criminalMapper.selectCriminalByBh(record.getBh().trim());
+        if (exist != null) {
+            // 抛出异常，前端会提示，拦截保存
+            throw new ServiceException("囚号【" + record.getBh() + "】已存在，请勿重复新增！");
+        }
 
         SysUser user = ShiroUtils.getSysUser();
         if (record.getDeptId() == null) {
@@ -243,17 +255,28 @@ public class BizCriminalServiceImpl implements IBizCriminalService {
                     }
 
                     // 把 Excel 里有的字段 put 进去覆盖，没有的（比如家庭关系）不会被碰到
-                    m1.put("zgjc", dto.getZgjc());
-                    m1.put("bczy", dto.getBczy());
-                    m1.put("csny", dto.getCsny());
-                    m1.put("jg", dto.getJg());
-                    m1.put("rjrq", dto.getRjrq());
-                    m1.put("zm", dto.getZm());
-                    m1.put("ypxq", dto.getYpxq());
-                    m1.put("xqzr", dto.getXqzr());
-                    m1.put("zdzf", dto.getZdzf());
-                    m1.put("slzf", dto.getSlzf());
-                    m1.put("stzk", dto.getStzk());
+                    if (StringUtils.isNotBlank(dto.getZgjc()))
+                        m1.put("zgjc", dto.getZgjc());
+                    if (StringUtils.isNotBlank(dto.getBczy()))
+                        m1.put("bczy", dto.getBczy());
+                    if (StringUtils.isNotBlank(dto.getCsny()))
+                        m1.put("csny", dto.getCsny());
+                    if (StringUtils.isNotBlank(dto.getJg()))
+                        m1.put("jg", dto.getJg());
+                    if (StringUtils.isNotBlank(dto.getRjrq()))
+                        m1.put("rjrq", dto.getRjrq());
+                    if (StringUtils.isNotBlank(dto.getZm()))
+                        m1.put("zm", dto.getZm());
+                    if (StringUtils.isNotBlank(dto.getYpxq()))
+                        m1.put("ypxq", dto.getYpxq());
+                    if (StringUtils.isNotBlank(dto.getXqzr()))
+                        m1.put("xqzr", dto.getXqzr());
+                    if (StringUtils.isNotBlank(dto.getZdzf()))
+                        m1.put("zdzf", dto.getZdzf());
+                    if (StringUtils.isNotBlank(dto.getSlzf()))
+                        m1.put("slzf", dto.getSlzf());
+                    if (StringUtils.isNotBlank(dto.getStzk()))
+                        m1.put("stzk", dto.getStzk());
 
                     // 放回主 Map
                     dataMap.put("module1", m1);

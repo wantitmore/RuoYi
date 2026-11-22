@@ -23,7 +23,7 @@
                                 <div class="col-sm-2">
                                     <input type="text" id="qBh" class="form-control">
                                 </div>
-                                <div class="col-sm-4">
+                                <div class="col-sm-6">
                                     <button type="button" class="btn btn-primary" onclick="loadTable()">
                                         <i class="fa fa-search"></i> 查询
                                     </button>
@@ -36,6 +36,13 @@
                                     <button type="button" class="btn btn-info" onclick="openImportModal()">
                                         <i class="fa fa-upload"></i> 批量导入
                                     </button>
+                                    <div id="deptSwitchWrap"
+                                        style="display:none; display:inline-block; margin-left: 10px; vertical-align: middle;">
+                                        <label style="font-weight: normal; margin-right: 5px;">监区：</label>
+                                        <select id="switchDeptSelect" class="form-control"
+                                            style="width: 150px; display:inline-block;" onchange="onSwitchDeptChange()">
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </form>
@@ -47,12 +54,14 @@
                             </li>
                             <li>
                                 <a href="javascript:void(0)" onclick="switchTab('public', this)">
-                                    本部门公共档案 <span class="badge" id="badgePublic">0</span>
+                                    <span class="tab-dept-text">本部门</span>公共档案 <span class="badge"
+                                        id="badgePublic">0</span>
                                 </a>
                             </li>
                             <li>
                                 <a href="javascript:void(0)" onclick="switchTab('all', this)">
-                                    本部门全部档案 <span class="badge" id="badgeAll">0</span>
+                                    <span class="tab-dept-text">本部门</span>全部档案 <span class="badge"
+                                        id="badgeAll">0</span>
                                 </a>
                             </li>
                         </ul>
@@ -69,7 +78,7 @@
         var ctx = [[@{/}]];
         var canTransferDept = [[${ canTransferDept }]];
         var currentFilterType = 'my';
-        console.log('canTransferDept =', canTransferDept);
+        var canSwitchDept = [[${ canSwitchDept }]];
         $(function () {
             $('#dataTable').bootstrapTable({
                 url: ctx + 'biz/activeProfile/list',
@@ -80,11 +89,11 @@
                 pageSize: 10,
                 pageList: [10, 20, 50],
                 queryParams: function (p) {
-                    console.log('【queryParams】filterType =', currentFilterType);
                     return {
                         pageNum: p.offset / p.limit + 1,
                         pageSize: p.limit,
                         filterType: currentFilterType,
+                        deptId: getQueryDeptId(),
                         xm: $('#qXm').val(),
                         bh: $('#qBh').val()
                     };
@@ -126,8 +135,39 @@
                     }
                 ]
             });
+            // 只有上级单位（部门下存在子部门）才显示“监区”下拉框；本监区账号直接隐藏
+            if (canSwitchDept) {
+                $.get(ctx + 'biz/activeProfile/switchDeptList', function (res) {
+                    if (res.code !== 0 || !res.data || res.data.length === 0) {
+                        // 后端判定不是上级单位，稳妥起见也隐藏
+                        $('#deptSwitchWrap').hide();
+                        return;
+                    }
+                    var html = '<option value="">全部监区</option>';
+                    res.data.forEach(function (d) {
+                        // 按层级缩进，便于区分多级部门
+                        var indent = '';
+                        for (var i = 0; i < (d.level || 0); i++) {
+                            indent += '\u00A0\u00A0\u00A0';
+                        }
+                        if (d.level) indent += '└ ';
+                        html += '<option value="' + d.deptId + '" data-name="' + d.deptName + '">'
+                            + indent + d.deptName + '</option>';
+                    });
+                    $('#switchDeptSelect').html(html);
+                    $('#deptSwitchWrap').show();
+                    refreshTabText();
+                });
+            } else {
+                $('#deptSwitchWrap').hide();
+            }
             loadBadgeCounts();
         });
+
+        function onSwitchDeptChange() {
+            refreshTabText();
+            loadTable(); // 刷新表格和徽章
+        }
 
         function delCriminal(id) {
             if (!confirm('确认要删除该罪犯档案吗？')) return;
@@ -154,8 +194,30 @@
             loadBadgeCounts();
         }
 
+        /**
+         * 获取当前查询的部门ID：
+         * - 上级单位：取“监区”下拉框的值（空串表示全部监区）
+         * - 本监区账号：下拉框已隐藏，不传 deptId，由后端数据权限限定为本部门
+         */
+        function getQueryDeptId() {
+            if (!canSwitchDept) return '';
+            return $('#switchDeptSelect').val() || '';
+        }
+
+        /** 明细类 Tab（公共/全部）跟随所选监区，文案也跟着变 */
+        function refreshTabText() {
+            var deptId = getQueryDeptId();
+            var text = '本部门';
+            if (deptId) {
+                text = $('#switchDeptSelect option:selected').attr('data-name') || '本部门';
+            } else if (canSwitchDept) {
+                text = '所辖监区';
+            }
+            $('.tab-dept-text').text(text);
+        }
+
         function loadBadgeCounts() {
-            $.post(ctx + 'biz/activeProfile/countByType', {}, function (res) {
+            $.post(ctx + 'biz/activeProfile/countByType', { deptId: getQueryDeptId() }, function (res) {
                 if (res.code === 0) {
                     $('#badgeMy').text(res.data.my || 0);
                     $('#badgePublic').text(res.data.publicCount || 0);
@@ -382,22 +444,30 @@
             layer.open({
                 type: 1,
                 title: '批量导入档案',
-                area: ['450px', '250px'],
+                area: ['500px', '280px'], // 稍微调高了一点弹窗
                 content: '<div style="padding:20px;">' +
-                    '<p>请上传包含“罪犯编号、姓名、专管警察”等信息的Excel文件。</p>' +
-                    '<input type="file" id="importFile" class="form-control" accept=".xlsx,.xls">' +
+                    '<div style="margin-bottom:20px;">' +
+                    '   <p style="margin-bottom:8px;font-weight:bold;">第一步：下载并填写模板</p>' +
+                    '   <a href="javascript:void(0)" class="btn btn-sm btn-success" onclick="downloadTemplate()">' +
+                    '       <i class="fa fa-download"></i> 下载标准导入模板' +
+                    '   </a>' +
+                    '   <span style="color:#999;font-size:12px;margin-left:10px;">（请勿修改模板第一行的表头文字）</span>' +
+                    '</div>' +
+                    '<div>' +
+                    '   <p style="margin-bottom:8px;font-weight:bold;">第二步：上传填好的文件</p>' +
+                    '   <input type="file" id="importFile" class="form-control" accept=".xlsx,.xls">' +
+                    '</div>' +
                     '</div>',
                 btn: ['开始导入', '取消'],
                 yes: function (idx) {
                     var file = $('#importFile')[0].files[0];
-                    if (!file) { layer.msg('请选择文件'); return; }
+                    if (!file) { layer.msg('请选择要上传的 Excel 文件'); return; }
 
                     var formData = new FormData();
                     formData.append("file", file);
-                    // 可选：如果导入时指定了目标监区，可以一起传过去
-                    // formData.append("deptId", $('#someDeptSelect').val()); 
 
-                    layer.load(1); // 开个loading
+                    layer.load(1); // 开个 loading
+
                     $.ajax({
                         url: ctx + 'biz/activeProfile/importExcel',
                         type: 'POST',
@@ -407,20 +477,27 @@
                         success: function (res) {
                             layer.closeAll('loading');
                             if (res.code === 0) {
-                                layer.alert(res.msg, { icon: 1 });
+                                // 如果你后端的导入是异步的，或者有部分失败，用 layer.alert 提示更清楚
+                                layer.alert(res.msg, { icon: 1, title: '导入结果' });
                                 layer.close(idx);
                                 loadTable(); // 刷新列表
                             } else {
-                                layer.alert(res.msg, { icon: 2 });
+                                layer.alert(res.msg, { icon: 2, title: '导入失败' });
                             }
                         },
                         error: function () {
                             layer.closeAll('loading');
-                            layer.msg('导入失败，请检查网络或联系管理员');
+                            layer.msg('请求失败，请检查网络或文件大小');
                         }
                     });
                 }
             });
+        }
+
+        // 增加下载模板的函数
+        function downloadTemplate() {
+            // 直接触发浏览器的下载请求
+            window.location.href = ctx + 'biz/activeProfile/exportTemplate';
         }
 
     </script>

@@ -30,10 +30,15 @@ import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.utils.ShiroUtils;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.service.ISysDeptService;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.web.controller.biz.activeprofile.domain.BizCriminal;
+import com.ruoyi.web.controller.biz.activeprofile.domain.CriminalImportDto;
 import com.ruoyi.web.controller.biz.activeprofile.service.IBizCriminalService;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @Controller
 @RequestMapping("/biz/activeProfile")
@@ -57,7 +62,12 @@ public class CriminalController extends BaseController {
         boolean canTransferDept = ShiroUtils.getSubject()
                 .isPermitted("biz:activeprofile:transferDept");
         mmap.put("canTransferDept", canTransferDept);
-        System.out.println("=== canTransferDept = " + canTransferDept);
+
+        // 部门切换：只有上级单位（本部门下存在子部门）才显示下拉框
+        SysUser currentUser = ShiroUtils.getSysUser();
+        boolean canSwitchDept = currentUser.getDeptId() != null
+                && deptService.selectNormalChildrenDeptById(currentUser.getDeptId()) > 0;
+        mmap.put("canSwitchDept", canSwitchDept);
         return prefix + "/list";
     }
 
@@ -67,9 +77,6 @@ public class CriminalController extends BaseController {
     @ResponseBody
     public TableDataInfo list(BizCriminal query,
             @RequestParam(required = false, defaultValue = "my") String filterType) {
-        System.out.println("=== filterType = " + filterType);
-        System.out.println(">>> @RequestParam filterType = {}" + filterType);
-        System.out.println(">>> BizCriminal.filterType = {}" + query.getFilterType());
         startPage();
         SysUser user = ShiroUtils.getSysUser();
 
@@ -234,14 +241,76 @@ public class CriminalController extends BaseController {
         return success(result);
     }
 
+    /**
+     * 上级单位切换查看监区档案时，下拉框可选的监区列表。
+     * 返回当前用户数据范围内（若依数据权限）的“所有下级部门”，按层级缩进排序；
+     * 本监区账号（部门下无子部门）返回空列表，前端据此隐藏下拉框。
+     */
+    @RequiresPermissions("biz:activeprofile:view")
+    @GetMapping("/switchDeptList")
+    @ResponseBody
+    public AjaxResult switchDeptList() {
+        SysUser currentUser = ShiroUtils.getSysUser();
+        Long currentDeptId = currentUser.getDeptId();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        // 1. 检查子部门数量
+        int childCount = deptService.selectNormalChildrenDeptById(currentDeptId);
+        System.out.println("=== 当前部门ID: " + currentDeptId + "，直属下级数量: " + childCount);
+
+        if (currentDeptId == null || childCount <= 0) {
+            return success(result);
+        }
+
+        // 2. 检查查出来的部门列表
+        List<SysDept> depts = deptService.selectDeptList(new SysDept());
+        System.out.println("=== 权限内能查到的部门总数: " + depts.size());
+
+        String selfKey = "," + currentDeptId + ",";
+        for (SysDept d : depts) {
+            // 3. 检查每个部门的 ancestors 匹配情况
+            System.out.println("=== 正在比对: " + d.getDeptName() + "，ancestors=" + d.getAncestors());
+
+            if (currentDeptId.equals(d.getDeptId())) {
+                continue; // 过滤自己
+            }
+            String ancestors = d.getAncestors();
+            // 这里加个 trim()，防止数据库里有空格导致匹配失败
+            if (StringUtils.isEmpty(ancestors) || !("," + ancestors.trim() + ",").contains(selfKey)) {
+                System.out.println("    -> 不是当前部门的下级，被过滤");
+                continue;
+            }
+
+            // 计算层级...
+            String[] ids = ancestors.split(",");
+            int idx = -1;
+            for (int i = 0; i < ids.length; i++) {
+                if (String.valueOf(currentDeptId).equals(ids[i].trim())) {
+                    idx = i;
+                    break;
+                }
+            }
+            int level = idx < 0 ? 0 : Math.max(ids.length - idx - 2, 0);
+
+            Map<String, Object> item = new HashMap<>();
+            item.put("deptId", d.getDeptId());
+            item.put("deptName", d.getDeptName());
+            item.put("parentId", d.getParentId());
+            item.put("level", level);
+            result.add(item);
+            System.out.println("    -> 成功加入下拉框");
+        }
+        return success(result);
+    }
+
     @RequiresPermissions("biz:activeprofile:view")
     @PostMapping("/countByType")
     @ResponseBody
-    public AjaxResult countByType() {
+    public AjaxResult countByType(@RequestParam(required = false) Long deptId) {
         SysUser user = ShiroUtils.getSysUser();
         Map<String, Object> result = new HashMap<>();
 
-        // 我的专管
+        // 我的专管（只统计本人，不受监区切换影响）
         BizCriminal q1 = new BizCriminal();
         q1.setOwnerId(user.getUserId());
         result.put("my", criminalService.selectCriminalList(q1).size());
@@ -249,10 +318,12 @@ public class CriminalController extends BaseController {
         // 本部门公共
         BizCriminal q2 = new BizCriminal();
         q2.setOwnerIdNull(true);
+        q2.setDeptId(deptId);
         result.put("publicCount", criminalService.selectCriminalList(q2).size());
 
         // 本部门全部
         BizCriminal q3 = new BizCriminal();
+        q3.setDeptId(deptId);
         result.put("all", criminalService.selectCriminalList(q3).size());
 
         return success(result);
@@ -265,11 +336,22 @@ public class CriminalController extends BaseController {
     @PostMapping("/importExcel")
     @ResponseBody
     public AjaxResult importExcel(@RequestParam("file") MultipartFile file) {
-    try {
-        String msg = criminalService.importExcel(file);
-        return success(msg);
-    } catch (Exception e) {
-        return error(e.getMessage());
+        try {
+            String msg = criminalService.importExcel(file);
+            return success(msg);
+        } catch (Exception e) {
+            return error(e.getMessage());
+        }
     }
-}
+
+    /**
+     * 下载导入模板
+     */
+    @RequiresPermissions("biz:activeprofile:add") // 借用新增权限即可
+    @GetMapping("/exportTemplate")
+    public void exportTemplate(HttpServletResponse response) {
+        ExcelUtil<CriminalImportDto> util = new ExcelUtil<>(CriminalImportDto.class);
+        // 传入空列表，就会自动生成一个只有表头的模板
+        util.exportExcel(response, new ArrayList<>(), "档案导入模板");
+    }
 }
